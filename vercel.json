@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/api/health", "destination": "/api/index.py" },
+    { "source": "/api/camera-event", "destination": "/api/index.py" },
+    { "source": "/api/track", "destination": "/api/index.py" },
+    { "source": "/api/events", "destination": "/api/index.py" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

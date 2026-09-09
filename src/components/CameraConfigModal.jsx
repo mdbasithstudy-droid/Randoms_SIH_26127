@@ -1,0 +1,138 @@
+import React, { useEffect, useState } from 'react'
+import { useSimulation } from '../context/SimulationContext'
+import { SAMPLE_CAMERA_CONFIGS } from '../data/constants'
+import { withSeconds } from '../utils/format'
+
+/**
+ * CAMERA CONFIGURATION modal.
+ * Opens when a camera is clicked. Cameras stay physically fixed — only their
+ * network metadata is edited here. Saved config lives in React state (locally
+ * persisted), never written continuously to Firebase.
+ *
+ * Fields: Camera ID (read-only), Place/Location, Date, Timestamp.
+ * The configured TIMESTAMP is the camera's session-time reference. Actual
+ * vehicle detection times are generated live by the simulation clock when a
+ * vehicle crosses the camera — they are never the static configured value.
+ */
+export default function CameraConfigModal() {
+  const {
+    cameras, cameraConfigTarget, updateCamera, closeCameraConfig, addToast
+  } = useSimulation()
+
+  const cam = cameras.find((c) => c.id === cameraConfigTarget)
+  const [location, setLocation] = useState(cam?.location || '')
+  const [date, setDate] = useState(cam?.date || '')
+  const [startTime, setStartTime] = useState(cam?.startTime || '')
+  const [error, setError] = useState(null)
+
+  // reset local state whenever a different camera is targeted
+  useEffect(() => {
+    if (cam) {
+      setLocation(cam.location || '')
+      setDate(cam.date || '')
+      setStartTime(cam.startTime || '')
+    }
+    setError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraConfigTarget])
+
+  if (!cam) return null
+
+  const useSample = () => {
+    const s = SAMPLE_CAMERA_CONFIGS[cam.id]
+    if (s) {
+      setLocation(s.location)
+      setDate(s.date)
+      setStartTime(s.startTime)
+      setError(null)
+    }
+  }
+
+  const save = () => {
+    if (!location.trim() || !date || !startTime) {
+      setError('ALL CAMERA FIELDS ARE REQUIRED — location, date and timestamp')
+      return
+    }
+    updateCamera(cam.id, {
+      location: location.trim(),
+      date,
+      startTime: withSeconds(startTime)
+    })
+    addToast('ok', `${cam.id} CONFIGURATION SAVED — ${location.trim()}`)
+    closeCameraConfig()
+  }
+
+  const onKey = (e) => {
+    if (e.key === 'Escape') closeCameraConfig()
+  }
+
+  return (
+    <div
+      className="modal-overlay"
+      onClick={(e) => e.target === e.currentTarget && closeCameraConfig()}
+    >
+      <div className="modal cam-config-modal" role="dialog" aria-modal="true" aria-label={`${cam.id} configuration`} onKeyDown={onKey}>
+        <div className="modal-head">
+          <h3>⚙ CAMERA CONFIGURATION</h3>
+          <button className="btn btn-ghost" onClick={closeCameraConfig}>✕ CANCEL</button>
+        </div>
+
+        <div className="cam-config-id mono">
+          <span className="hk">CAMERA ID</span>
+          <span className="val">{cam.id}</span>
+          <span className="tag">FIXED NODE — NOT MOVABLE</span>
+        </div>
+
+        <div className="field-grid mt-16">
+          <div className="field">
+            <label htmlFor="cc-loc">Place / Location <em>*</em></label>
+            <input
+              id="cc-loc"
+              type="text"
+              value={location}
+              placeholder="e.g. Forum Nexus Mall"
+              onChange={(e) => setLocation(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="cc-date">Date <em>*</em></label>
+            <input
+              id="cc-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="cc-time">Timestamp <em>*</em></label>
+            <input
+              id="cc-time"
+              type="time"
+              step="1"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="cam-config-note">
+          <span className="mono">CONFIGURED SESSION TIME: <b>{startTime ? `${withSeconds(startTime)} IST` : '—'}</b></span>
+          <span className="muted mono">
+            This timestamp is the camera&apos;s session reference. Actual vehicle detection
+            times are generated live by the simulation clock when a vehicle crosses this
+            camera — detection events are never the static configured value.
+          </span>
+        </div>
+
+        <button className="btn btn-ghost mt-8" onClick={useSample}>USE DEMO VALUE</button>
+
+        {error && <div className="msg error">{error}</div>}
+
+        <div className="spread mt-16">
+          <button className="btn btn-primary btn-big" onClick={save}>SAVE CONFIGURATION</button>
+          <button className="btn btn-ghost" onClick={closeCameraConfig}>CANCEL</button>
+        </div>
+      </div>
+    </div>
+  )
+}

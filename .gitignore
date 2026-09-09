@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Env / secrets — NEVER commit real credentials
+.env
+.env.local
+.env.*.local
+*.service-account.json
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
+credentials.json
+
+# Local backend runtime data
+data/
+*.log
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+.idea/
+
+# Firebase
+.firebase/
+firebase-debug.log
