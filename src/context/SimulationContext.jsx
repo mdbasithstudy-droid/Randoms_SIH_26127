@@ -448,6 +448,11 @@ export function SimulationProvider({ children }) {
     addToast('info', 'SIMULATION RESET — historical Firebase records preserved')
   }, [addToast])
 
+  const clearAllDetections = useCallback(async () => {
+    await firebaseService.clearAllDetections()
+    addToast('info', 'Recent AI camera detections cleared')
+  }, [addToast])
+
   // expose
   const value = useMemo(
     () => ({
@@ -479,6 +484,7 @@ export function SimulationProvider({ children }) {
       removeBlacklistedVehicle,
       dismissBlacklistAlert,
       clearBlacklistRecordings,
+      clearAllDetections,
       mode,
       stats,
       toasts,
@@ -493,7 +499,7 @@ export function SimulationProvider({ children }) {
       closeCameraConfig, cameraConfigTarget, attention,
       phase, positions, lanes, detected, flash, camUI, feed, events,
       blacklistedVehicles, blacklistAlerts, addBlacklistedVehicle, removeBlacklistedVehicle,
-      dismissBlacklistAlert, clearBlacklistRecordings, mode, stats, toasts, simClock, startSimulation, resetSimulation, addToast
+      dismissBlacklistAlert, clearBlacklistRecordings, clearAllDetections, mode, stats, toasts, simClock, startSimulation, resetSimulation, addToast
     ]
   )
 

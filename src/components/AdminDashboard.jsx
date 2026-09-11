@@ -182,7 +182,7 @@ function BlacklistAlertHistory() {
 export default function AdminDashboard() {
   const {
     phase, stats, events, vehicles, cameras, configuredCount, allConfigured,
-    startSimulation, resetSimulation, sim, addToast
+    startSimulation, resetSimulation, sim, addToast, clearAllDetections
   } = useSimulation()
   const [trackOpen, setTrackOpen] = useState(false)
   const [lastResult, setLastResult] = useState(null)
@@ -300,7 +300,18 @@ export default function AdminDashboard() {
           </div>
 
           <div className="panel">
-            <div className="panel-title">Recent AI Detections</div>
+            <div className="panel-title spread">
+              <div>Recent AI Detections</div>
+              {events && events.length > 0 && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ color: 'var(--text-mid)', border: '1px solid var(--line)', padding: '3px 9px', fontSize: '0.74rem' }}
+                  onClick={clearAllDetections}
+                >
+                  Clear Detections
+                </button>
+              )}
+            </div>
             <CameraEvents events={events} />
           </div>
         </div>

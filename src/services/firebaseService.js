@@ -437,6 +437,29 @@ async function clearBlacklistRecordings() {
   return { ok: true }
 }
 
+async function clearAllDetections() {
+  const toDelete = [...cache]
+  cache = []
+  persistLocal()
+  notify()
+
+  if (mode === 'firestore') {
+    try {
+      const db = getFirestoreDb()
+      if (db) {
+        const deletePromises = toDelete
+          .filter((e) => e.id && !e.id.startsWith('evt_'))
+          .map((e) => deleteDoc(doc(db, COLLECTION, e.id)))
+        await Promise.all(deletePromises)
+      }
+    } catch (e) {
+      console.error('Failed to clear cameraEvents from Firestore', e)
+    }
+  }
+
+  return { ok: true }
+}
+
 export const firebaseService = {
   init,
   getMode,
@@ -448,6 +471,7 @@ export const firebaseService = {
   addBlacklistedVehicle,
   removeBlacklistedVehicle,
   clearBlacklistRecordings,
+  clearAllDetections,
   getEvents,
   trackVehicle,
   onError,
