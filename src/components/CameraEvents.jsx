@@ -2,8 +2,8 @@ import React from 'react'
 import { shortStamp } from '../utils/format'
 
 /**
- * LATEST CAMERA ACTIVITY — newest camera passage events first, streamed live
- * from the vehicleEvents store (Firestore or the local demo store).
+ * RECENT AI DETECTIONS — newest camera detections first, streamed live from the
+ * cameraEvents store (Firestore onSnapshot + local mirror).
  */
 export default function CameraEvents({ events }) {
   const recent = (events || []).slice(0, 10)
@@ -11,8 +11,8 @@ export default function CameraEvents({ events }) {
   if (!recent.length) {
     return (
       <div className="empty-state">
-        <div className="big">NO CAMERA ACTIVITY YET</div>
-        <div>Run a simulation — every camera crossing is recorded here in real time.</div>
+        <div className="big">No detections yet</div>
+        <div>Run a simulation — each AI camera crossing is recorded here in real time.</div>
       </div>
     )
   }
@@ -22,11 +22,11 @@ export default function CameraEvents({ events }) {
       <table className="evt-table">
         <thead>
           <tr>
-            <th>CAMERA</th>
-            <th>NUMBER PLATE</th>
-            <th>VEHICLE</th>
-            <th>LOCATION</th>
-            <th>TIME (IST)</th>
+            <th>Camera</th>
+            <th>Number plate</th>
+            <th>Vehicle</th>
+            <th>Location</th>
+            <th>Time (IST)</th>
           </tr>
         </thead>
         <tbody>

@@ -7,8 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "api": "uvicorn api.index:app --reload --port 8000"
+    "preview": "vite preview"
   },
   "dependencies": {
     "firebase": "^10.14.1",

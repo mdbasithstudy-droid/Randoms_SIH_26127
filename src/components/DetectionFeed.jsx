@@ -5,8 +5,8 @@ export default function DetectionFeed({ feed }) {
   if (!feed.length) {
     return (
       <div className="empty-state mt-12">
-        <div className="big">ANPR MONITOR STANDBY</div>
-        <div>Camera detections will appear here as vehicles cross each fixed detection zone.</div>
+        <div className="big">No detections yet</div>
+        <div>AI vehicle detections appear here as vehicles cross each fixed camera point.</div>
       </div>
     )
   }
@@ -15,7 +15,7 @@ export default function DetectionFeed({ feed }) {
       {feed.map((d) => (
         <div className="anpr-card" key={d.id}>
           <div className="ac-head">
-            <span>◉ ANPR MATCH DETECTED</span>
+            <span>AI Vehicle Detected</span>
             <span className="tag">{d.cameraId}</span>
           </div>
           <div className="ac-plate">{d.numberPlate}</div>

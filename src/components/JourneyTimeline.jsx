@@ -28,8 +28,8 @@ export default function JourneyTimeline({ result }) {
   if (!result || !result.ok) {
     return (
       <div className="empty-state">
-        <div className="big">VEHICLE JOURNEY MAP</div>
-        <div>Track a number plate from the AUTHORITY CONSOLE to reconstruct its journey.</div>
+        <div className="big">Vehicle Journey</div>
+        <div>Track a number plate from the Authority Console to reconstruct its journey.</div>
       </div>
     )
   }
@@ -47,8 +47,8 @@ export default function JourneyTimeline({ result }) {
       <div className="journey-vehicle-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <div className="mono" style={{ fontSize: '0.56rem', letterSpacing: '1.6px', color: 'var(--text-low)' }}>
-              VEHICLE TRACK HISTORY
+            <div className="mono" style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--cyan)' }}>
+              AI Journey Correlation
             </div>
             <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 600, letterSpacing: '2px', color: '#fff', marginTop: 4 }}>
               {vehicle?.numberPlate || '—'}
@@ -61,8 +61,8 @@ export default function JourneyTimeline({ result }) {
             </div>
           </div>
         </div>
-        <div className="mono mt-8" style={{ fontSize: '0.62rem', color: 'var(--text-low)' }}>
-          {events?.length || 0} CAMERA PASSAGE(S) · {foundCount}/{routeCams.length} ROUTE NODES
+        <div className="mono mt-8" style={{ fontSize: '0.72rem', color: 'var(--text-low)' }}>
+          {events?.length || 0} camera detections · {foundCount}/{routeCams.length} route nodes
         </div>
       </div>
 
@@ -88,7 +88,7 @@ export default function JourneyTimeline({ result }) {
                   {complete && <span className="n-state">✓ DETECTED</span>}
                 </div>
                 <div className="n-loc">{loc}</div>
-                <div className="n-time">{complete ? `DETECTED ${shortStamp(ev.ts)}` : '— NOT YET DETECTED —'}</div>
+                <div className="n-time">{complete ? `Detected ${shortStamp(ev.ts)}` : 'Not detected'}</div>
               </div>
             )
           })}
@@ -96,7 +96,7 @@ export default function JourneyTimeline({ result }) {
           {/* END */}
           <div className="journey-node end complete">
             <span className="node-dot" />
-            <div className="n-cam">END — JOURNEY {foundCount === routeCams.length ? 'COMPLETE' : 'PARTIAL'}</div>
+            <div className="n-cam">END — Journey {foundCount === routeCams.length ? 'Complete' : 'Partial'}</div>
             <div className="n-loc">{foundCount === routeCams.length ? 'Full route reconstructed' : 'Awaiting remaining detections'}</div>
           </div>
         </div>

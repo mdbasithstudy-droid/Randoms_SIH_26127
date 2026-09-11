@@ -6,15 +6,14 @@ import { useSimulation } from '../context/SimulationContext'
  * Console — editing here is reflected there and vice-versa. The values are
  * frozen into every camera passage event when the simulation runs.
  */
-export default function SimulationConfig({ compact = false, title = 'SIMULATION CONFIGURATION' }) {
+export default function SimulationConfig({ compact = false, title = 'Simulation Configuration' }) {
   const { sim, setSim } = useSimulation()
 
   return (
-    <div className="panel accent">
+    <div className="panel">
       <div className="panel-title">
-        <span className="bar" />
         {title}
-        <span className="hint">// traffic monitoring session metadata</span>
+        <span className="hint">simulation session metadata</span>
       </div>
       <div className="field-grid">
         <div className="field">
@@ -47,9 +46,9 @@ export default function SimulationConfig({ compact = false, title = 'SIMULATION 
         </div>
       </div>
       {!compact && (
-        <div className="mt-12 muted" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '1px' }}>
-          ⚠ These values define this monitoring session and are attached to every camera passage event recorded to Firebase.
-        </div>
+        <p className="field-note">
+          These values define this monitoring session and are attached to every AI camera detection event.
+        </p>
       )}
     </div>
   )

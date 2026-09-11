@@ -50,7 +50,7 @@ export default function CameraConfigModal() {
 
   const save = () => {
     if (!location.trim() || !date || !startTime) {
-      setError('ALL CAMERA FIELDS ARE REQUIRED — location, date and timestamp')
+      setError('All camera fields are required — location, date and simulation time')
       return
     }
     updateCamera(cam.id, {
@@ -58,7 +58,7 @@ export default function CameraConfigModal() {
       date,
       startTime: withSeconds(startTime)
     })
-    addToast('ok', `${cam.id} CONFIGURATION SAVED — ${location.trim()}`)
+    addToast('ok', `${cam.id} configuration saved — ${location.trim()}`)
     closeCameraConfig()
   }
 
@@ -73,19 +73,19 @@ export default function CameraConfigModal() {
     >
       <div className="modal cam-config-modal" role="dialog" aria-modal="true" aria-label={`${cam.id} configuration`} onKeyDown={onKey}>
         <div className="modal-head">
-          <h3>⚙ CAMERA CONFIGURATION</h3>
-          <button className="btn btn-ghost" onClick={closeCameraConfig}>✕ CANCEL</button>
+          <h3>Camera Configuration</h3>
+          <button className="btn btn-ghost" onClick={closeCameraConfig}>✕ Close</button>
         </div>
 
-        <div className="cam-config-id mono">
-          <span className="hk">CAMERA ID</span>
+        <div className="cam-config-id">
+          <span className="hk">Camera</span>
           <span className="val">{cam.id}</span>
-          <span className="tag">FIXED NODE — NOT MOVABLE</span>
+          <span className="tag">Fixed node — not movable</span>
         </div>
 
         <div className="field-grid mt-16">
           <div className="field">
-            <label htmlFor="cc-loc">Place / Location <em>*</em></label>
+            <label htmlFor="cc-loc">Location <em>*</em></label>
             <input
               id="cc-loc"
               type="text"
@@ -104,7 +104,7 @@ export default function CameraConfigModal() {
             />
           </div>
           <div className="field">
-            <label htmlFor="cc-time">Timestamp <em>*</em></label>
+            <label htmlFor="cc-time">Simulation Time <em>*</em></label>
             <input
               id="cc-time"
               type="time"
@@ -116,21 +116,20 @@ export default function CameraConfigModal() {
         </div>
 
         <div className="cam-config-note">
-          <span className="mono">CONFIGURED SESSION TIME: <b>{startTime ? `${withSeconds(startTime)} IST` : '—'}</b></span>
-          <span className="muted mono">
-            This timestamp is the camera&apos;s session reference. Actual vehicle detection
-            times are generated live by the simulation clock when a vehicle crosses this
-            camera — detection events are never the static configured value.
+          <span className="mono" style={{ fontWeight: 700 }}>Session reference: <b>{startTime ? `${withSeconds(startTime)} IST` : '—'}</b></span>
+          <span>
+            This is the camera&apos;s session reference. Actual detection times are generated live
+            by the simulation clock when a vehicle crosses — detections are never the static value.
           </span>
         </div>
 
-        <button className="btn btn-ghost mt-8" onClick={useSample}>USE DEMO VALUE</button>
+        <button className="btn btn-ghost mt-8" onClick={useSample}>Use demo value</button>
 
         {error && <div className="msg error">{error}</div>}
 
         <div className="spread mt-16">
-          <button className="btn btn-primary btn-big" onClick={save}>SAVE CONFIGURATION</button>
-          <button className="btn btn-ghost" onClick={closeCameraConfig}>CANCEL</button>
+          <button className="btn btn-primary btn-big" onClick={save}>Save Configuration</button>
+          <button className="btn btn-ghost" onClick={closeCameraConfig}>Cancel</button>
         </div>
       </div>
     </div>

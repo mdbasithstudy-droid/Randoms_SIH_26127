@@ -98,9 +98,9 @@ export default function TrackVehicle({ onResult, onClose }) {
 
       <div className="mt-12 spread">
         <button className="btn btn-primary" disabled={searching} onClick={search}>
-          {searching ? 'SEARCHING…' : 'SEARCH VEHICLE'}
+          {searching ? 'Tracking…' : 'Track Vehicle'}
         </button>
-        {onClose && <button className="btn btn-ghost" onClick={onClose}>CLOSE</button>}
+        {onClose && <button className="btn btn-ghost" onClick={onClose}>Close</button>}
       </div>
 
       {msg && <div className={`msg ${msg.type}`}>{msg.text}</div>}

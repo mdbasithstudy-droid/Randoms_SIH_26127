@@ -13,9 +13,9 @@ function Camera({ camera, status = 'IDLE', attention = false, onConfigure }) {
   const configured = Boolean(camera.location && camera.date && camera.startTime)
   const detecting = status === 'DETECTED'
 
-  const label = detecting ? 'VEHICLE DETECTED' : configured ? 'SENSOR ACTIVE' : 'SENSOR READY'
+  const label = detecting ? 'AI Detection · Detected' : configured ? 'AI Detection · Active' : 'AI Detection · Setup'
   const statusMod = detecting ? 'detect' : configured ? 'active' : 'ready'
-  const locText = configured ? camera.location : 'LOCATION NOT CONFIGURED'
+  const locText = configured ? camera.location : 'Location not configured'
 
   const cls = ['cam-unit']
   if (detecting) cls.push('detecting')
@@ -48,7 +48,7 @@ function Camera({ camera, status = 'IDLE', attention = false, onConfigure }) {
           {label}
         </span>
       </span>
-      <span className="cam-hint">⚙ CLICK TO CONFIGURE</span>
+      <span className="cam-hint">Click to configure</span>
     </button>
   )
 }

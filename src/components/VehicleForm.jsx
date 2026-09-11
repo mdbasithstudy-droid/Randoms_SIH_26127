@@ -58,7 +58,7 @@ export default function VehicleForm() {
     const added = addVehicles(rows)
     setMsg({
       type: 'success',
-      text: `${added.length} VEHICLE(S) SAVED TO FLEET — they now appear at the START of the CAMERA SIMULATION road.`
+      text: `${added.length} vehicle(s) saved to the fleet — they now appear at the START of the Camera Simulation road.`
     })
     setRows(Array.from({ length: count }, () => ({ model: '', colour: '', numberPlate: '' })))
   }
@@ -66,25 +66,24 @@ export default function VehicleForm() {
   return (
     <div className="panel">
       <div className="panel-title">
-        <span className="bar" />
-        ADD VEHICLES
-        <span className="hint">// build the simulation fleet</span>
+        Vehicle Management
+        <span className="hint">add vehicles to the simulation fleet</span>
       </div>
 
       <div className="num-stepper">
-        <span className="mono muted" style={{ fontSize: '0.62rem', letterSpacing: '1.4px' }}>NUMBER OF VEHICLES</span>
+        <span className="lbl">Number of Vehicles</span>
         <button className="btn" onClick={() => setCountV(count - 1)}>−</button>
         <span className="val">{count}</span>
         <button className="btn" onClick={() => setCountV(count + 1)}>+</button>
-        <button className="btn btn-ghost" onClick={loadDemo}>USE DEMO FLEET</button>
+        <button className="btn btn-ghost" onClick={loadDemo}>Load demo fleet</button>
       </div>
 
       <div className="vehicle-rows">
         {rows.map((row, i) => (
           <div className="vf-block" key={i}>
             <div className="vf-head">
-              <span>VEHICLE {String(i + 1).padStart(2, '0')}</span>
-              <span className="muted" style={{ color: 'var(--text-low)' }}>// fleet slot</span>
+              <span>Vehicle {String(i + 1).padStart(2, '0')}</span>
+              <span className="muted" style={{ color: 'var(--text-low)' }}>fleet slot</span>
             </div>
             <div className="field-grid">
               <div className="field">
@@ -124,18 +123,18 @@ export default function VehicleForm() {
       {msg && <div className={`msg ${msg.type}`}>{msg.text}</div>}
 
       <div className="mt-12 spread">
-        <button className="btn btn-success btn-big" onClick={save}>SAVE VEHICLES</button>
+        <button className="btn btn-success btn-big" onClick={save}>Save Vehicles</button>
         {vehicles.length > 0 && (
           <button className="btn btn-danger" onClick={() => { clearVehicles(); setMsg(null); }}>
-            CLEAR FLEET ({vehicles.length})
+            Clear fleet ({vehicles.length})
           </button>
         )}
       </div>
 
       {vehicles.length > 0 && (
         <div className="mt-12">
-          <div className="mono muted mb-8" style={{ fontSize: '0.6rem', letterSpacing: '1.4px' }}>
-            SAVED FLEET — {vehicles.length} VEHICLE(S) READY FOR SIMULATION
+          <div className="mono muted mb-8" style={{ fontSize: '0.7rem', fontWeight: 600 }}>
+            Saved fleet — {vehicles.length} vehicle(s) ready for simulation
           </div>
           <div className="saved-chip-list">
             {vehicles.map((v) => (

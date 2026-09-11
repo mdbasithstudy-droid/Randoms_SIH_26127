@@ -18,6 +18,7 @@ import {
 } from '../data/constants'
 import { uid, todayLocalISO, nowLocalTime, blankCameraConfigs } from '../utils/format'
 import { firebaseService } from '../services/firebaseService'
+import { saveCameraDetection } from '../firebase/cameraEvents'
 
 const SimulationContext = createContext(null)
 
@@ -76,6 +77,8 @@ export function SimulationProvider({ children }) {
   const [camUI, setCamUI] = useState({}) // cameraId -> {status, ...vehicle}
   const [feed, setFeed] = useState([]) // ANPR detection feed (newest first)
   const [events, setEvents] = useState([]) // recent camera events (from store)
+  const [blacklistedVehicles, setBlacklistedVehicles] = useState([])
+  const [blacklistAlerts, setBlacklistAlerts] = useState([])
   const [mode, setMode] = useState('demo')
   const [toasts, setToasts] = useState([])
   const [stats, setStats] = useState({ launched: 0, events: 0, done: 0 })
@@ -113,11 +116,49 @@ export function SimulationProvider({ children }) {
     const m = firebaseService.init()
     setMode(m)
     const unsub = firebaseService.subscribe((rows) => setEvents(rows))
+    const unsubBL = firebaseService.subscribeBlacklist((list) => setBlacklistedVehicles(list))
     const errUnsub = firebaseService.onError((msg) => addToast('err', msg))
     return () => {
       unsub()
+      unsubBL()
       errUnsub()
     }
+  }, [addToast])
+
+  // ---------- blacklist management ----------
+  const addBlacklistedVehicle = useCallback(
+    async (rawPlate) => {
+      const res = await firebaseService.addBlacklistedVehicle(rawPlate)
+      if (!res.ok) {
+        addToast('warn', res.error || 'Failed to add to blacklist')
+      } else {
+        addToast('ok', `BLACKLIST ADDED — ${rawPlate.toUpperCase().replace(/\s+/g, '')}`)
+      }
+      return res
+    },
+    [addToast]
+  )
+
+  const removeBlacklistedVehicle = useCallback(
+    async (target) => {
+      const res = await firebaseService.removeBlacklistedVehicle(target)
+      if (!res.ok) {
+        addToast('warn', res.error || 'Failed to remove from blacklist')
+      } else {
+        addToast('info', 'Vehicle removed from blacklist')
+      }
+      return res
+    },
+    [addToast]
+  )
+
+  const dismissBlacklistAlert = useCallback((id) => {
+    setBlacklistAlerts((prev) => prev.filter((a) => a.id !== id))
+  }, [])
+
+  const clearBlacklistRecordings = useCallback(async () => {
+    await firebaseService.clearBlacklistRecordings()
+    addToast('info', 'Blacklisted vehicle detection history cleared')
   }, [addToast])
 
   // ---------- setters with persistence ----------
@@ -188,6 +229,25 @@ export function SimulationProvider({ children }) {
   const fireDetection = useCallback(
     (vehicle, camera, detectTs) => {
       const ts = detectTs || Date.now()
+      // Check CURRENT blacklist at detection time
+      const isBlacklisted = firebaseService.isBlacklisted(vehicle.numberPlate)
+
+      if (isBlacklisted) {
+        const normPlate = (vehicle.numberPlate || '').toUpperCase().replace(/\s+/g, '')
+        const alertItem = {
+          id: uid('bla'),
+          numberPlate: normPlate,
+          model: vehicle.model,
+          colour: vehicle.colour,
+          cameraId: camera.id,
+          location: camera.location,
+          ts,
+          timeStr: shortStamp(ts).replace(' IST', '')
+        }
+        setBlacklistAlerts((prev) => [alertItem, ...prev])
+        addToast('err', `⚠ BLACKLISTED VEHICLE DETECTED: ${normPlate} at ${camera.id}`)
+      }
+
       // local visual: highlight vehicle + camera + feed
       setCamUI((prev) => ({
         ...prev,
@@ -198,6 +258,7 @@ export function SimulationProvider({ children }) {
           numberPlate: vehicle.numberPlate,
           model: vehicle.model,
           colour: vehicle.colour,
+          isBlacklisted,
           ts
         }
       }))
@@ -229,6 +290,7 @@ export function SimulationProvider({ children }) {
         numberPlate: vehicle.numberPlate,
         model: vehicle.model,
         colour: vehicle.colour,
+        isBlacklisted,
         ts
       }
       setFeed((prev) => [feedItem, ...prev].slice(0, 8))
@@ -236,27 +298,25 @@ export function SimulationProvider({ children }) {
         setFeed((prev) => prev.filter((f) => f.id !== feedItem.id))
       }, ANPR_TOAST_MS)
 
-      // Firestore / local store write (the ONLY thing persisted — CAMERA_PASSAGE)
+      // Firestore write (the ONLY thing persisted — CAMERA_PASSAGE, once per crossing)
       runEventsRef.current += 1
       setStats((s) => ({ ...s, events: runEventsRef.current }))
-      const payload = {
-        vehicleId: vehicle.id,
-        numberPlate: vehicle.numberPlate,
-        vehicleModel: vehicle.model,
-        vehicleColour: vehicle.colour,
-        cameraId: camera.id,
-        location: camera.location,
-        simPlace: simSnapshotRef.current.place,
-        simDate: simSnapshotRef.current.date,
-        simStartTime: simSnapshotRef.current.time,
+      saveCameraDetection(
+        vehicle,
+        camera,
+        {
+          place: simSnapshotRef.current.place,
+          date: simSnapshotRef.current.date
+        },
         ts,
-        eventType: 'CAMERA_PASSAGE'
-      }
-      firebaseService.addEvent(payload).then((res) => {
-        if (res && res.ok === false) addToast('err', `CAMERA EVENT FAILED — ${camera.id}`)
-      }).catch(() => {
-        addToast('err', `CAMERA EVENT FAILED — ${camera.id}`)
-      })
+        isBlacklisted
+      )
+        .then((res) => {
+          if (res && res.ok === false) addToast('err', 'Firebase connection error — detection kept locally')
+        })
+        .catch(() => {
+          addToast('err', 'Firebase connection error — detection kept locally')
+        })
     },
     [addToast]
   )
@@ -341,7 +401,11 @@ export function SimulationProvider({ children }) {
               set.add(geo.id)
               const fullCam = camerasRef.current.find((x) => x.id === geo.id) || geo
               const detectTs = simBaseRef.current + elapsed
-              fireDetection(v, fullCam, detectTs)
+              try {
+                fireDetection(v, fullCam, detectTs)
+              } catch (err) {
+                console.error('Non-fatal camera detection error:', err)
+              }
             }
           })
         }
@@ -359,7 +423,7 @@ export function SimulationProvider({ children }) {
       rafRef.current = requestAnimationFrame(loop)
     }
     rafRef.current = requestAnimationFrame(loop)
-  }, [vehicles, sim, cameras, allConfigured, highlightUnconfigured, addToast])
+  }, [vehicles, sim, cameras, allConfigured, highlightUnconfigured, addToast, fireDetection])
 
   // ---------- reset simulation ----------
   const resetSimulation = useCallback(() => {
@@ -409,6 +473,12 @@ export function SimulationProvider({ children }) {
       camUI,
       feed,
       events,
+      blacklistedVehicles,
+      blacklistAlerts,
+      addBlacklistedVehicle,
+      removeBlacklistedVehicle,
+      dismissBlacklistAlert,
+      clearBlacklistRecordings,
       mode,
       stats,
       toasts,
@@ -421,8 +491,9 @@ export function SimulationProvider({ children }) {
       sim, setSim, vehicles, addVehicles, saveVehicles, clearVehicles,
       cameras, configuredCount, allConfigured, updateCamera, openCameraConfig,
       closeCameraConfig, cameraConfigTarget, attention,
-      phase, positions, lanes, detected, flash, camUI, feed, events, mode,
-      stats, toasts, simClock, startSimulation, resetSimulation, addToast
+      phase, positions, lanes, detected, flash, camUI, feed, events,
+      blacklistedVehicles, blacklistAlerts, addBlacklistedVehicle, removeBlacklistedVehicle,
+      dismissBlacklistAlert, clearBlacklistRecordings, mode, stats, toasts, simClock, startSimulation, resetSimulation, addToast
     ]
   )
 

@@ -1,45 +1,26 @@
 import React, { useEffect, useState } from 'react'
 import { SimulationProvider, useSimulation } from './context/SimulationContext'
 import Header from './components/Header'
+import Dashboard from './components/Dashboard'
 import CameraSimulation from './components/CameraSimulation'
 import AdminDashboard from './components/AdminDashboard'
 import CameraConfigModal from './components/CameraConfigModal'
-import { formatIST } from './utils/format'
+import BlacklistAlertModal from './components/BlacklistAlertModal'
 
 function Shell() {
-  const [view, setView] = useState('camera')
-  const { vehicles, events, mode, toasts } = useSimulation()
-  const [clock, setClock] = useState(() => formatIST(new Date()))
-
-  useEffect(() => {
-    const t = setInterval(() => setClock(formatIST(new Date())), 1000)
-    return () => clearInterval(t)
-  }, [])
+  const [view, setView] = useState('dashboard')
+  const { vehicles, configuredCount, toasts, blacklistAlerts, dismissBlacklistAlert } = useSimulation()
 
   return (
     <div className="app">
-      <Header mode={mode} vehiclesCount={vehicles.length} eventsCount={events.length} clock={clock} />
-
-      <div className="view-tabs">
-        <button
-          className={`tab-btn ${view === 'camera' ? 'active' : ''}`}
-          onClick={() => setView('camera')}
-        >
-          <span className="t-ico">◉</span> CAMERA SIMULATION
-        </button>
-        <button
-          className={`tab-btn ${view === 'admin' ? 'active' : ''}`}
-          onClick={() => setView('admin')}
-        >
-          <span className="t-ico">⬢</span> AUTHORITY CONSOLE
-        </button>
-      </div>
+      <Header view={view} setView={setView} configuredCount={configuredCount} vehiclesCount={vehicles.length} />
 
       <main className="main">
-        {view === 'camera' ? <CameraSimulation /> : <AdminDashboard />}
+        {view === 'dashboard' && <Dashboard setView={setView} />}
+        {view === 'camera' && <CameraSimulation />}
+        {view === 'admin' && <AdminDashboard />}
       </main>
 
-      {/* toasts */}
       <div className="toasts">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>
@@ -48,6 +29,9 @@ function Shell() {
 
       {/* click-a-camera -> configuration modal */}
       <CameraConfigModal />
+
+      {/* Authority Blacklist Alert Modal */}
+      <BlacklistAlertModal alerts={blacklistAlerts} onDismiss={dismissBlacklistAlert} />
     </div>
   )
 }
