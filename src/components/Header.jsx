@@ -3,7 +3,8 @@ import React, { useState } from 'react'
 const NAV = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'camera', label: 'Camera Simulation' },
-  { id: 'admin', label: 'Authority Console' }
+  { id: 'admin', label: 'Authority Console' },
+  { id: 'analytics', label: 'Urban Analytics' }
 ]
 
 export default function Header({ view, setView, configuredCount, vehiclesCount }) {

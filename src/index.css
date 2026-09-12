@@ -571,3 +571,315 @@ h1, h2, h3, h4 { color: var(--text-hi); }
   .brand-sub { letter-spacing: 0.06em; }
   .header-right .status-pill { display: none; }
 }
+
+/* ============================ URBAN ANALYTICS ============================ */
+
+/* Page hero */
+.ua-hero {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin: 2px 0 20px;
+}
+.ua-hero-text { flex: 1; min-width: 0; }
+.ua-hero-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: none; }
+.ua-title { margin: 0 0 6px; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; color: var(--text-hi); }
+.ua-desc { margin: 0; color: var(--text-mid); font-size: 0.96rem; max-width: 700px; }
+
+/* Overview cards grid */
+.ua-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+.ua-card {
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: 10px; padding: 16px 18px;
+}
+.ua-card-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.ua-card-label {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text-low);
+}
+.ua-card-icon { font-size: 1.1rem; }
+.ua-card-value {
+  font-size: 1.6rem; font-weight: 800; color: var(--text-hi); line-height: 1.1;
+}
+.ua-card-unit { font-size: 0.9rem; font-weight: 600; color: var(--text-low); }
+.ua-card-sub { font-size: 0.78rem; color: var(--text-mid); margin-top: 4px; }
+.ua-card-foot { font-size: 0.7rem; color: var(--text-low); margin-top: 6px; }
+
+/* Congestion value colors in overview card */
+.ua-cong-val-low  { color: var(--green); }
+.ua-cong-val-moderate { color: var(--amber); }
+.ua-cong-val-high { color: var(--red); }
+
+/* Network schematic */
+.ua-network-wrap { display: flex; flex-direction: column; gap: 14px; }
+.ua-network-label {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: 0.74rem;
+}
+.ua-network-badge {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--text-mid); background: var(--bg-inset);
+  border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px;
+  white-space: nowrap; text-transform: uppercase;
+}
+.ua-network-svg {
+  width: 100%; height: auto; max-height: 240px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: #fafbfd; display: block;
+}
+.ua-network-legend {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  font-size: 0.72rem; font-weight: 600; color: var(--text-low);
+  padding: 8px 2px 2px;
+}
+.ua-legend-item { display: flex; align-items: center; gap: 6px; }
+.ua-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+
+/* Congestion badge (inline pill) */
+.ua-cong-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+  border-radius: 999px; padding: 3px 9px; border: 1px solid;
+  white-space: nowrap;
+}
+.ua-cong-low      { color: var(--green);  background: var(--green-dim); border-color: #bbe7c7; }
+.ua-cong-moderate { color: var(--amber);  background: var(--amber-dim); border-color: #f3e2b8; }
+.ua-cong-high     { color: var(--red);    background: var(--red-dim);   border-color: #f3c7cc; }
+
+/* Traffic flow table */
+.ua-flow-table {
+  width: 100%; border-collapse: collapse; font-size: 0.83rem;
+}
+.ua-flow-table th {
+  text-align: left; font-weight: 700; font-size: 0.7rem;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-low);
+  border-bottom: 1px solid var(--line); padding: 7px 8px;
+}
+.ua-flow-table td {
+  padding: 9px 8px; border-bottom: 1px solid #eef1f6; color: var(--text-mid);
+  vertical-align: middle;
+}
+.ua-flow-table tr:last-child td { border-bottom: none; }
+.ua-flow-table tr:hover td { background: var(--bg-inset); }
+
+.ua-cam-tag {
+  display: inline-flex; font-size: 0.74rem; font-weight: 700;
+  color: var(--cyan); background: var(--cyan-dim); border: 1px solid #d6e4ff;
+  padding: 2px 8px; border-radius: 6px; white-space: nowrap;
+  font-family: var(--font-code);
+}
+.ua-route-arrow { color: var(--text-low); font-weight: 500; }
+
+.ua-note {
+  font-size: 0.72rem; color: var(--text-low); margin: 10px 0 0;
+  font-style: italic;
+}
+
+/* Congestion grid */
+.ua-congestion-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.ua-cong-card {
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 14px; background: #fff;
+  border-top: 3px solid var(--line);
+}
+.ua-cong-card-low      { border-top-color: var(--green); }
+.ua-cong-card-moderate { border-top-color: var(--amber); }
+.ua-cong-card-high     { border-top-color: var(--red);   }
+.ua-cong-cam-id {
+  font-family: var(--font-code); font-weight: 800; font-size: 0.84rem;
+  color: var(--text-hi); margin-bottom: 6px;
+}
+.ua-cong-loc {
+  font-size: 0.74rem; color: var(--text-low); margin: 6px 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ua-cong-stats { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.ua-cong-stat { display: flex; justify-content: space-between; gap: 8px; }
+.ua-cong-stat .hk {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-low);
+}
+.ua-cong-stat .hv { font-size: 0.82rem; font-weight: 700; color: var(--text-hi); }
+
+/* OD analysis */
+.ua-od-list { display: flex; flex-direction: column; gap: 9px; }
+.ua-od-row { display: flex; align-items: center; gap: 10px; }
+.ua-od-label {
+  font-size: 0.78rem; font-weight: 600; color: var(--text-hi);
+  min-width: 130px; font-family: var(--font-code); white-space: nowrap;
+}
+.ua-od-bar-wrap {
+  flex: 1; height: 10px; background: var(--bg-inset);
+  border-radius: 999px; overflow: hidden;
+}
+.ua-od-bar {
+  height: 100%; background: var(--cyan); border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.ua-od-count {
+  font-size: 0.78rem; font-weight: 800; color: var(--text-hi);
+  min-width: 24px; text-align: right;
+}
+
+/* Journey table extras */
+.ua-plate {
+  font-family: var(--font-code); font-weight: 700; font-size: 0.82rem;
+  color: var(--text-hi); letter-spacing: 0.03em;
+}
+.ua-vehicle-meta { font-size: 0.7rem; color: var(--text-low); margin-top: 2px; }
+.ua-stamp { font-family: var(--font-code); font-size: 0.76rem; color: var(--text-low); }
+
+/* Traffic hotspots */
+.ua-hotspot-list { display: flex; flex-direction: column; gap: 8px; }
+.ua-hotspot {
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; background: #fff;
+  border-left: 4px solid var(--line);
+}
+.ua-hotspot-low      { border-left-color: var(--green); }
+.ua-hotspot-moderate { border-left-color: var(--amber); }
+.ua-hotspot-high     { border-left-color: var(--red);   }
+.ua-hotspot-rank {
+  font-size: 1.05rem; font-weight: 800; color: var(--text-low);
+  min-width: 28px; text-align: center;
+}
+.ua-hotspot-body { flex: 1; min-width: 0; }
+.ua-hotspot-label {
+  font-weight: 700; font-size: 0.86rem; color: var(--text-hi);
+  font-family: var(--font-code);
+}
+.ua-hotspot-sub { font-size: 0.74rem; color: var(--text-mid); margin-top: 2px; }
+.ua-hotspot-detail { font-size: 0.72rem; color: var(--text-low); margin-top: 2px; }
+
+/* AI Insights panel */
+.ua-insights { display: flex; flex-direction: column; gap: 10px; }
+.ua-insight-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 0.84rem; color: var(--text-mid); line-height: 1.5;
+  padding: 10px 12px; background: var(--bg-inset);
+  border-radius: 8px; border: 1px solid var(--line);
+}
+.ua-insight-dot {
+  color: var(--cyan); font-size: 0.7rem; flex: none; margin-top: 3px;
+}
+
+/* Footer note */
+.ua-footer-note {
+  font-size: 0.72rem; color: var(--text-low); text-align: center;
+  margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--line);
+}
+
+/* Responsive overrides for UA */
+@media (max-width: 760px) {
+  .ua-hero { flex-direction: column; }
+  .ua-hero-right { flex-direction: row; align-items: flex-start; }
+  .ua-overview-grid { grid-template-columns: repeat(2, 1fr); }
+  .ua-od-label { min-width: 90px; }
+}
+@media (max-width: 480px) {
+  .ua-overview-grid { grid-template-columns: 1fr 1fr; }
+  .ua-flow-table th:nth-child(4),
+  .ua-flow-table td:nth-child(4) { display: none; }
+}
+
+/* ============================ CSV IMPORT ============================ */
+
+/* Allow num-stepper to wrap when Import CSV button is present */
+.num-stepper {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Confirm box shown after parsing the CSV */
+.csv-confirm-box {
+  margin-top: 14px;
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.csv-confirm-title {
+  font-size: 0.86rem;
+  color: var(--text-hi);
+  word-break: break-all;
+}
+.csv-confirm-summary {
+  font-size: 0.82rem;
+  color: var(--text-mid);
+}
+.csv-confirm-choice { display: flex; flex-direction: column; gap: 8px; }
+.csv-choice-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-mid);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.csv-choice-btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.csv-choice-sub {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+.csv-cancel {
+  align-self: flex-start;
+  color: var(--text-low);
+  border: 1px solid var(--line);
+  padding: 4px 12px;
+  font-size: 0.78rem;
+}
+
+/* Invalid rows list inside confirm box */
+.csv-invalid-list {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.csv-invalid-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-low);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.csv-invalid-row {
+  font-size: 0.76rem;
+  color: var(--red);
+  font-family: var(--font-code);
+  background: var(--red-dim);
+  border: 1px solid #f3c7cc;
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+.csv-invalid-row.muted {
+  color: var(--text-low);
+  background: var(--bg-inset);
+  border-color: var(--line);
+  font-family: var(--font-sans);
+}
+
+/* Filename shown in result banner */
+.csv-filename {
+  font-family: var(--font-code);
+  font-size: 0.8em;
+  color: var(--text-low);
+}

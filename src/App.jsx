@@ -6,6 +6,7 @@ import CameraSimulation from './components/CameraSimulation'
 import AdminDashboard from './components/AdminDashboard'
 import CameraConfigModal from './components/CameraConfigModal'
 import BlacklistAlertModal from './components/BlacklistAlertModal'
+import UrbanAnalytics from './components/UrbanAnalytics'
 
 function Shell() {
   const [view, setView] = useState('dashboard')
@@ -19,6 +20,7 @@ function Shell() {
         {view === 'dashboard' && <Dashboard setView={setView} />}
         {view === 'camera' && <CameraSimulation />}
         {view === 'admin' && <AdminDashboard />}
+        {view === 'analytics' && <UrbanAnalytics />}
       </main>
 
       <div className="toasts">
