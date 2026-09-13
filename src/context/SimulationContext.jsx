@@ -16,7 +16,7 @@ import {
   ANPR_TOAST_MS,
   SIM_DEFAULTS
 } from '../data/constants'
-import { uid, todayLocalISO, nowLocalTime, blankCameraConfigs } from '../utils/format'
+import { uid, todayLocalISO, nowLocalTime, blankCameraConfigs, shortStamp } from '../utils/format'
 import { firebaseService } from '../services/firebaseService'
 import { saveCameraDetection } from '../firebase/cameraEvents'
 
