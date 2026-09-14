@@ -1,7 +1,6 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useSimulation } from '../context/SimulationContext'
 import { displayDate, withSeconds, shortStamp } from '../utils/format'
-import { firebaseService } from '../services/firebaseService'
 import SimulationConfig from './SimulationConfig'
 import VehicleForm from './VehicleForm'
 import TrackVehicle from './TrackVehicle'
@@ -107,9 +106,25 @@ function BlacklistManager() {
 }
 
 function BlacklistAlertHistory() {
-  const { events, clearBlacklistRecordings } = useSimulation()
-  const blacklistEvents = (events || []).filter(
-    (e) => Boolean(e.isBlacklisted) === true || firebaseService.isBlacklisted(e.numberPlate)
+  const { blacklistedVehicles, clearBlacklistRecordings } = useSimulation()
+
+  // Crossings by blacklisted vehicles are stored on the blacklist entries
+  // themselves (`blacklistedVehicles[].detections`) — never in `cameraEvents`.
+  const alerts = useMemo(
+    () =>
+      (blacklistedVehicles || [])
+        .flatMap((item) =>
+          (item.detections || []).map((d, i) => ({
+            key: `${item.id}-${d.ts}-${i}`,
+            numberPlate: item.numberPlate,
+            vehicleModel: d.vehicleModel,
+            cameraId: d.cameraId,
+            location: d.location,
+            ts: d.ts
+          }))
+        )
+        .sort((a, b) => (b.ts || 0) - (a.ts || 0)),
+    [blacklistedVehicles]
   )
 
   return (
@@ -120,8 +135,8 @@ function BlacklistAlertHistory() {
           BLACKLIST ALERT HISTORY
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="hint">{blacklistEvents.length} alert(s) recorded</span>
-          {blacklistEvents.length > 0 && (
+          <span className="hint">{alerts.length} alert(s) recorded</span>
+          {alerts.length > 0 && (
             <button
               className="btn btn-ghost btn-sm"
               style={{ color: 'var(--red)', border: '1px solid #f3c7cc', padding: '3px 9px', fontSize: '0.74rem' }}
@@ -133,18 +148,18 @@ function BlacklistAlertHistory() {
         </div>
       </div>
 
-      {blacklistEvents.length === 0 ? (
+      {alerts.length === 0 ? (
         <div className="empty-state" style={{ padding: '20px 12px' }}>
           <div className="big">No blacklisted vehicle detections</div>
-          <div>When a blacklisted vehicle passes a camera, alerts are logged here.</div>
+          <div>When a blacklisted vehicle passes a camera, the crossing is recorded on its blacklist entry.</div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflowY: 'auto' }}>
-          {blacklistEvents.map((e) => {
+          {alerts.map((e) => {
             const timeStr = shortStamp(e.ts).replace(' IST', '')
             return (
               <div
-                key={e.id || e.refId}
+                key={e.key}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',

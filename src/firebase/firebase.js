@@ -21,6 +21,20 @@ const firebaseConfig = {
 
 export const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId)
 
+// Quietly falling back to demo mode is confusing in a real deployment. If this
+// *production* build was made without the VITE_FIREBASE_* variables (typically
+// because they were never set on the host), say so instead of silently writing
+// nothing to Firestore.
+if (!isFirebaseConfigured && import.meta.env.PROD) {
+  console.warn(
+    '[TrafIQ] Firebase is not configured in this production build — running in local demo mode.\n' +
+      'Set VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, ' +
+      'VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID and VITE_FIREBASE_APP_ID ' +
+      'in your host (e.g. Vercel → Project → Settings → Environment Variables), then REDEPLOY ' +
+      '(Vite inlines these at build time, so a refresh is not enough).'
+  )
+}
+
 const existing = getApps()
 export const app = isFirebaseConfigured
   ? existing.length

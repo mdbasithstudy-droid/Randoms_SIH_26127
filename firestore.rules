@@ -1,0 +1,78 @@
+rules_version = '2';
+
+// TrafIQ — Firestore security rules for project `trafiq-7680f`.
+//
+// Exactly TWO collections exist, matching the app's two write paths:
+//   • cameraEvents        — one document per vehicle crossing a camera
+//   • blacklistedVehicles — plates flagged by the Authority Console
+//
+// Note the data model guarantees this enforces:
+//   1. A vehicle can only ever appear in Firestore as the RESULT OF A CAMERA
+//      DETECTION. Registering the fleet writes to localStorage only, and there
+//      is no vehicles collection here.
+//   2. A BLACKLISTED plate never appears in `cameraEvents` at all. Its
+//      crossings are recorded on its own `blacklistedVehicles` document.
+//
+// ⚠ These rules are intentionally open (read: true / unauthenticated writes)
+// so the prototype works without login. Tighten them before any public
+// deployment — see the note at the bottom.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Camera passage events ────────────────────────────────────────────────
+    // Created only by the simulation when a vehicle crosses a fixed camera.
+    match /cameraEvents/{eventId} {
+      allow read: if true;
+
+      // Only genuine, well-formed detection records may be created — and never
+      // one for a blacklisted plate (those belong in `blacklistedVehicles`).
+      allow create: if request.resource.data.eventType == 'CAMERA_PASSAGE'
+                    && request.resource.data.isBlacklisted == false
+                    && request.resource.data.numberPlate is string
+                    && request.resource.data.numberPlate.size() > 0
+                    && request.resource.data.cameraId is string
+                    && request.resource.data.cameraId.matches('^CAM-0[1-9]$');
+
+      // Detections are an audit trail — never edited in place.
+      allow update: if false;
+
+      // "Clear Detections" / "Clear Blacklist Recordings" in the Authority Console.
+      allow delete: if true;
+    }
+
+    // ── Authority blacklist ──────────────────────────────────────────────────
+    // Holds the blacklisted plates AND the record of where/when each was seen.
+    match /blacklistedVehicles/{plate} {
+      allow read: if true;
+
+      allow create: if request.resource.data.numberPlate is string
+                    && request.resource.data.numberPlate.size() > 0;
+
+      // Only the recorded crossings may change — the plate is immutable, so a
+      // blacklist entry can never be repointed at a different vehicle.
+      allow update: if request.resource.data.numberPlate == resource.data.numberPlate
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['detections', 'detectionCount',
+                                   'lastDetectedAt', 'lastCameraId', 'lastLocation']);
+
+      allow delete: if true;
+    }
+
+    // ── Everything else is denied ────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Before going public, the two `allow read/create/delete: if true` lines above
+// should become authenticated-only, e.g.:
+//
+//   allow read:   if request.auth != null;
+//   allow create: if request.auth != null && <shape checks>;
+//   allow delete: if request.auth != null && request.auth.token.admin == true;
+//
+// and the app should sign in with Firebase Auth before writing.
+// ─────────────────────────────────────────────────────────────────────────────

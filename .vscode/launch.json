@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "TrafIQ: Chrome against dev server",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/src",
+      "preLaunchTask": "vite: dev",
+      "sourceMaps": true
+    },
+    {
+      "name": "TrafIQ: Edge against dev server",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/src",
+      "preLaunchTask": "vite: dev",
+      "sourceMaps": true
+    }
+  ]
+}

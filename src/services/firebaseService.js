@@ -21,6 +21,7 @@ import {
   where,
   onSnapshot,
   getDocs,
+  updateDoc,
   serverTimestamp
 } from 'firebase/firestore'
 
@@ -36,8 +37,17 @@ let cache = [] // newest-first records (de-duplicated)
 let firestoreUnsub = null
 
 const blacklistListeners = new Set()
-let blacklistCache = [] // Array of { id, numberPlate, createdAt }
+// Each entry is
+//   { id, numberPlate, createdAt,
+//     detectionCount, lastDetectedAt, lastCameraId, lastLocation,
+//     detections: [{ ts, cameraId, location, vehicleModel, vehicleColour }] }
+// Blacklisted plates are NEVER written to `cameraEvents` — their camera
+// crossings are recorded here, on the blacklist document itself.
+let blacklistCache = []
 let firestoreBlacklistUnsub = null
+
+// How many recent crossings are kept per blacklisted vehicle.
+const BLACKLIST_DETECTION_LIMIT = 20
 
 let mode = isFirebaseConfigured ? 'firestore' : 'demo'
 
@@ -160,6 +170,23 @@ function listenFirestore() {
   )
 }
 
+function normalizeBlacklistDoc(id, data) {
+  const detections = Array.isArray(data.detections)
+    ? data.detections.filter(Boolean).slice(0, BLACKLIST_DETECTION_LIMIT)
+    : []
+  const newest = detections[0] || null
+  return {
+    id,
+    numberPlate: normalizePlate(data.numberPlate),
+    createdAt: data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : Date.now(),
+    detectionCount: typeof data.detectionCount === 'number' ? data.detectionCount : detections.length,
+    lastDetectedAt: typeof data.lastDetectedAt === 'number' ? data.lastDetectedAt : (newest ? newest.ts : null),
+    lastCameraId: data.lastCameraId || (newest ? newest.cameraId : '') || '',
+    lastLocation: data.lastLocation || (newest ? newest.location : '') || '',
+    detections
+  }
+}
+
 function listenFirestoreBlacklist() {
   const db = getFirestoreDb()
   if (!db) return
@@ -171,11 +198,7 @@ function listenFirestoreBlacklist() {
       snap.docs.forEach((docSnap) => {
         const data = docSnap.data()
         if (data && data.numberPlate) {
-          list.push({
-            id: docSnap.id,
-            numberPlate: normalizePlate(data.numberPlate),
-            createdAt: data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : Date.now()
-          })
+          list.push(normalizeBlacklistDoc(docSnap.id, data))
         }
       })
       list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
@@ -195,6 +218,16 @@ function getMode() {
 }
 
 async function addEvent(payload) {
+  // Invariant: `cameraEvents` NEVER contains a blacklisted plate. A blacklisted
+  // vehicle is a security alert, not a traffic record, and lives only in
+  // `blacklistedVehicles` (see recordBlacklistDetection). SimulationContext
+  // already routes blacklisted crossings away from here, so this is a guard
+  // against a future caller getting it wrong — and firestore.rules rejects it too.
+  if (payload.isBlacklisted) {
+    console.warn('[trafiq] refused to write blacklisted plate to cameraEvents:', payload.numberPlate)
+    return { ok: true, skipped: true, reason: 'BLACKLISTED_NOT_A_CAMERA_EVENT' }
+  }
+
   const rec = {
     refId: payload.refId || uid('evt'),
     vehicleId: payload.vehicleId,
@@ -284,7 +317,12 @@ async function addBlacklistedVehicle(rawPlate) {
   const newItem = {
     id: uid('bl'),
     numberPlate: plate,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    detectionCount: 0,
+    lastDetectedAt: null,
+    lastCameraId: '',
+    lastLocation: '',
+    detections: []
   }
 
   blacklistCache = [newItem, ...blacklistCache]
@@ -297,7 +335,9 @@ async function addBlacklistedVehicle(rawPlate) {
       if (!db) throw new Error('Firestore not initialised')
       const docRef = await addDoc(collection(db, BLACKLIST_COLLECTION), {
         numberPlate: plate,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        detectionCount: 0,
+        detections: []
       })
       newItem.id = docRef.id
       return { ok: true, item: newItem }
@@ -347,6 +387,65 @@ async function removeBlacklistedVehicle(target) {
   return { ok: true }
 }
 
+/**
+ * Record a blacklisted vehicle crossing a camera — ON its blacklist entry.
+ *
+ * Blacklisted plates are deliberately never written to `cameraEvents`: they are
+ * security alerts, not traffic records, and live only in `blacklistedVehicles`.
+ * Each crossing is prepended to `detections` (capped at BLACKLIST_DETECTION_LIMIT)
+ * and summarised by `lastDetectedAt` / `lastCameraId` / `lastLocation` /
+ * `detectionCount`.
+ */
+async function recordBlacklistDetection({ numberPlate, vehicleModel, vehicleColour, cameraId, location, ts }) {
+  const plate = normalizePlate(numberPlate)
+  if (!plate) return { ok: false, error: 'Empty number plate' }
+
+  const idx = blacklistCache.findIndex((item) => normalizePlate(item.numberPlate) === plate)
+  if (idx === -1) return { ok: false, error: 'Vehicle is not blacklisted' }
+
+  const prev = blacklistCache[idx]
+  const detection = {
+    ts: ts || Date.now(),
+    cameraId: cameraId || '',
+    location: location || '',
+    vehicleModel: vehicleModel || '',
+    vehicleColour: vehicleColour || ''
+  }
+  const nextItem = {
+    ...prev,
+    detectionCount: (prev.detectionCount || 0) + 1,
+    lastDetectedAt: detection.ts,
+    lastCameraId: detection.cameraId,
+    lastLocation: detection.location,
+    detections: [detection, ...(prev.detections || [])].slice(0, BLACKLIST_DETECTION_LIMIT)
+  }
+
+  // local-first: the Authority Console reflects the alert immediately
+  blacklistCache = blacklistCache.map((item, i) => (i === idx ? nextItem : item))
+  persistLocalBlacklist()
+  notifyBlacklist()
+
+  if (mode === 'firestore' && prev.id && !prev.id.startsWith('bl_')) {
+    try {
+      const db = getFirestoreDb()
+      if (!db) throw new Error('Firestore not initialised')
+      await updateDoc(doc(db, BLACKLIST_COLLECTION, prev.id), {
+        detections: nextItem.detections,
+        detectionCount: nextItem.detectionCount,
+        lastDetectedAt: nextItem.lastDetectedAt,
+        lastCameraId: nextItem.lastCameraId,
+        lastLocation: nextItem.lastLocation
+      })
+      return { ok: true, item: nextItem, source: 'firestore' }
+    } catch (e) {
+      console.error('Firestore blacklist detection write failed', e)
+      return { ok: true, item: nextItem, source: 'local', warning: 'Saved locally' }
+    }
+  }
+
+  return { ok: true, item: nextItem, source: 'local' }
+}
+
 function init() {
   mode = isFirebaseConfigured ? 'firestore' : 'demo'
   blacklistCache = loadLocalBlacklist()
@@ -365,21 +464,27 @@ function getEvents() {
 
 /** Query a vehicle journey from the merged (mirror + Firestore) store. */
 async function trackVehicle({ numberPlate, vehicleModel, vehicleColour }) {
-  const plate = (numberPlate || '').trim().toUpperCase()
+  // Plates are matched space-insensitively — the same rule the blacklist uses —
+  // so "MH12AB4921" and "MH 12 AB 4921" resolve to the same vehicle. The full
+  // event stream is already mirrored in `cache` (local history + realtime
+  // listener), so the normalized filter works in both demo and Firestore mode.
+  const plate = normalizePlate(numberPlate)
   if (!plate) return { ok: false, reason: 'NUMBER_PLATE_REQUIRED' }
 
-  let rows = cache.filter((r) => r.numberPlate.toUpperCase() === plate)
+  const matchesPlate = (r) => normalizePlate(r.numberPlate) === plate
+
+  let rows = cache.filter(matchesPlate)
 
   if (mode === 'firestore') {
     try {
       const db = getFirestoreDb()
-      const q = query(collection(db, COLLECTION), where('numberPlate', '==', plate), limit(300))
+      const q = query(collection(db, COLLECTION), where('numberPlate', '==', (numberPlate || '').trim().toUpperCase()), limit(300))
       const snap = await getDocs(q)
       snap.docs.forEach((doc) => {
         const rec = normalizeDoc(doc.id, doc.data())
         if (rec) cache = upsert(cache, rec)
       })
-      rows = cache.filter((r) => r.numberPlate.toUpperCase() === plate)
+      rows = cache.filter(matchesPlate)
     } catch (e) {
       console.warn('Firestore track unavailable — using local history', e)
     }
@@ -413,24 +518,57 @@ function onError(cb) {
   return () => clearInterval(poll)
 }
 
+/**
+ * Clear the recorded crossings from every blacklist entry, and purge any
+ * legacy blacklisted records still sitting in `cameraEvents` from before the
+ * two were separated.
+ */
 async function clearBlacklistRecordings() {
+  blacklistCache = blacklistCache.map((item) => ({
+    ...item,
+    detectionCount: 0,
+    lastDetectedAt: null,
+    lastCameraId: '',
+    lastLocation: '',
+    detections: []
+  }))
+  persistLocalBlacklist()
+  notifyBlacklist()
+
+  // legacy cleanup — blacklisted plates should never be in cameraEvents
   const isBlacklistedRec = (e) => Boolean(e.isBlacklisted) === true || isBlacklisted(e.numberPlate)
-  const toDelete = cache.filter(isBlacklistedRec)
-  cache = cache.filter((e) => !isBlacklistedRec(e))
-  persistLocal()
-  notify()
+  const legacyEvents = cache.filter(isBlacklistedRec)
+  if (legacyEvents.length) {
+    cache = cache.filter((e) => !isBlacklistedRec(e))
+    persistLocal()
+    notify()
+  }
 
   if (mode === 'firestore') {
     try {
       const db = getFirestoreDb()
       if (db) {
-        const deletePromises = toDelete
-          .filter((e) => e.id && !e.id.startsWith('evt_'))
-          .map((e) => deleteDoc(doc(db, COLLECTION, e.id)))
-        await Promise.all(deletePromises)
+        await Promise.all(
+          blacklistCache
+            .filter((item) => item.id && !item.id.startsWith('bl_'))
+            .map((item) =>
+              updateDoc(doc(db, BLACKLIST_COLLECTION, item.id), {
+                detections: [],
+                detectionCount: 0,
+                lastDetectedAt: null,
+                lastCameraId: '',
+                lastLocation: ''
+              })
+            )
+        )
+        await Promise.all(
+          legacyEvents
+            .filter((e) => e.id && !e.id.startsWith('evt_'))
+            .map((e) => deleteDoc(doc(db, COLLECTION, e.id)))
+        )
       }
     } catch (e) {
-      console.error('Failed to clear blacklisted cameraEvents from Firestore', e)
+      console.error('Failed to clear blacklist recordings from Firestore', e)
     }
   }
 
@@ -470,6 +608,7 @@ export const firebaseService = {
   isBlacklisted,
   addBlacklistedVehicle,
   removeBlacklistedVehicle,
+  recordBlacklistDetection,
   clearBlacklistRecordings,
   clearAllDetections,
   getEvents,

@@ -1,7 +1,11 @@
-// cameraEvents — the ONLY Firestore writes in the app.
+// cameraEvents — the only CAMERA EVENT write path in the app.
 //
-// Firestore is written exclusively when a vehicle crosses a fixed camera
+// A document is written exclusively when a vehicle crosses a fixed camera
 // detection point. Vehicle position / animation frames are never written.
+//
+// ⚠ Blacklisted plates NEVER reach this module. When a blacklisted vehicle is
+// detected it is recorded on its own `blacklistedVehicles` document instead —
+// see firebaseService.recordBlacklistDetection().
 //
 // saveCameraDetection(vehicle, camera, simulation, detectionTs, isBlacklisted)
 //   vehicle       -> { id, numberPlate, model, colour }

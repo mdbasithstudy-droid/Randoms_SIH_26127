@@ -246,9 +246,26 @@ export function SimulationProvider({ children }) {
         }
         setBlacklistAlerts((prev) => [alertItem, ...prev])
         addToast('err', `⚠ BLACKLISTED VEHICLE DETECTED: ${normPlate} at ${camera.id}`)
+
+        // The crossing is recorded on the vehicle's own blacklist entry — never
+        // as a camera event — so `cameraEvents` stays free of blacklisted plates.
+        firebaseService
+          .recordBlacklistDetection({
+            numberPlate: vehicle.numberPlate,
+            vehicleModel: vehicle.model,
+            vehicleColour: vehicle.colour,
+            cameraId: camera.id,
+            location: camera.location,
+            ts
+          })
+          .then((res) => {
+            if (res && res.ok === false) addToast('err', 'Firebase connection error — blacklist alert kept locally')
+          })
+          .catch(() => {
+            addToast('err', 'Firebase connection error — blacklist alert kept locally')
+          })
       }
 
-      // local visual: highlight vehicle + camera + feed
       setCamUI((prev) => ({
         ...prev,
         [camera.id]: {
@@ -298,7 +315,12 @@ export function SimulationProvider({ children }) {
         setFeed((prev) => prev.filter((f) => f.id !== feedItem.id))
       }, ANPR_TOAST_MS)
 
-      // Firestore write (the ONLY thing persisted — CAMERA_PASSAGE, once per crossing)
+      // ── Persisted record: CAMERA_PASSAGE, once per crossing ────────────────
+      // Blacklisted plates are deliberately NOT recorded as camera events: they
+      // were written to their blacklist entry above instead. They still appear
+      // in the live ANPR feed, but never in `cameraEvents`.
+      if (isBlacklisted) return
+
       runEventsRef.current += 1
       setStats((s) => ({ ...s, events: runEventsRef.current }))
       saveCameraDetection(
@@ -309,7 +331,7 @@ export function SimulationProvider({ children }) {
           date: simSnapshotRef.current.date
         },
         ts,
-        isBlacklisted
+        false
       )
         .then((res) => {
           if (res && res.ok === false) addToast('err', 'Firebase connection error — detection kept locally')

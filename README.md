@@ -20,9 +20,12 @@ npm run preview    # serve the production build
 
 ## Firebase setup
 
-1. Create a Firebase project and enable **Cloud Firestore**.
-2. Add a **Web app** and copy its config into a local **`.env.local`** file
-   (copy `.env.example`). `.env.local` is already gitignored.
+This project is wired to the Firebase project **`trafiq-7680f`**. The config
+lives in **`.env.local`** (gitignored); `.env.example` mirrors it as a template.
+
+To point at a different project, replace the values in `.env.local` with the
+Web app config from Firebase Console → Project settings → Your apps, then
+**restart the dev server** (Vite reads env at startup):
 
 ```env
 VITE_FIREBASE_API_KEY=...
@@ -33,30 +36,136 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 ```
 
-3. **Security Rules** are configured in the Firebase console
-   (Firestore → Rules). For this localhost prototype use development rules
-   that allow read/write for `cameraEvents`, e.g.:
+If these are missing or blank the app still runs in a fully local **demo mode**
+(status panel shows "Demo store") — Firebase is optional.
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /cameraEvents/{doc} {
-      allow read, write: if true;   // dev only — tighten before going public
-    }
-  }
+### Firestore data model — exactly TWO collections
+
+| Collection | Written when | Written by |
+|---|---|---|
+| `cameraEvents` | a **non-blacklisted** vehicle crosses a camera | `saveCameraDetection()` |
+| `blacklistedVehicles` | the Authority adds a plate, **and** each time a blacklisted vehicle crosses a camera | `addBlacklistedVehicle()`, `recordBlacklistDetection()` |
+
+**A vehicle only ever appears in Firestore as the result of a camera detection.**
+Registering the fleet ("Save Vehicles") writes to `localStorage` only — there is
+no `vehicles` collection, and `firestore.rules` denies creating one.
+
+**Blacklisted plates are never written to `cameraEvents`.** When a blacklisted
+vehicle is detected it is recorded on its own `blacklistedVehicles` document
+instead, so the two concerns never mix:
+
+- `cameraEvents` = traffic volume, ANPR history, journey correlation.
+- `blacklistedVehicles` = the watchlist **and** the audit trail of where/when
+each watchlisted plate was seen.
+
+A blacklisted crossing still shows the live ANPR feed card, the red toast and
+the Authority alert modal — it simply produces no `cameraEvents` document.
+
+Each blacklist document looks like:
+
+```jsonc
+{
+  "numberPlate": "TN01AB1234",
+  "createdAt": "<server timestamp>",
+  "detectionCount": 3,                        // total crossings seen
+  "lastDetectedAt": 1757862482000,             // simulation-clock ms
+  "lastCameraId": "CAM-03",
+  "lastLocation": "Marina Beach Road",
+  "detections": [                             // newest first, capped at 20
+    { "ts": 1757862482000, "cameraId": "CAM-03",
+      "location": "Marina Beach Road",
+      "vehicleModel": "Hyundai Creta", "vehicleColour": "White" }
+  ]
 }
 ```
 
+The **Authority Console → Blacklist Alert History** panel reads these
+`detections`; **Clear Recordings** empties them (and purges any legacy
+blacklisted rows still sitting in `cameraEvents` from before the split).
+
+### Security rules
+
+Rules are version-controlled in **`firestore.rules`** (mounted by `firebase.json`)
+and are already deployed to `trafiq-7680f`. After editing them, re-deploy:
+
+```bash
+firebase login                       # once, if not already authenticated
+firebase deploy --only firestore:rules
+```
+
+Or paste `firestore.rules` into Firebase Console → Firestore → Rules → Publish.
+
+> The rules are intentionally open for this prototype (unauthenticated
+> read/write on the two collections only). `firestore.rules` ends with a note on
+> what to tighten before any public deployment.
+
 > Only the **Firebase Web SDK** is used. Do **not** use the Admin SDK or place
 > a service-account JSON anywhere in this project.
+
+## Deploying to Vercel
+
+This is a root-level Vite SPA, which Vercel builds with no restructuring —
+`vercel.json` just pins the build and adds SPA + asset-caching rules. There is
+**no backend**: the browser talks straight to Firestore using the Web SDK, so no
+serverless functions are needed.
+
+### 1. Commit — Vercel only deploys what is in Git
+
+```bash
+git status --short              # confirm src/data/*.js are not "??" untracked
+git add -A
+git commit -m "chore: Vercel deployment config"
+git push
+```
+
+> ⚠️ `src/data/cameras.js` and `src/data/constants.js` must be committed. They
+> were hidden by the `.gitignore` `data/` rule for a long time, and a deploy
+> without them fails with `Could not resolve "../data/cameras"`.
+
+### 2. Import the project
+
+Vercel → **Add New → Project** → import the repo. The **Vite** preset is
+detected automatically; leave Build Command and Output Directory untouched.
+
+### 3. Add the Firebase environment variables — **required**
+
+`.env.local` is gitignored, so it is **not** uploaded. Without these variables a
+Vercel build silently falls back to local demo mode ("Demo store") and writes
+nothing to Firestore.
+
+Project → **Settings → Environment Variables** → add all six for
+**Production, Preview and Development**:
+
+| Name | Value |
+|---|---|
+| `VITE_FIREBASE_API_KEY` | *(from `.env.local`)* |
+| `VITE_FIREBASE_AUTH_DOMAIN` | *(from `.env.local`)* |
+| `VITE_FIREBASE_PROJECT_ID` | *(from `.env.local`)* |
+| `VITE_FIREBASE_STORAGE_BUCKET` | *(from `.env.local`)* |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | *(from `.env.local`)* |
+| `VITE_FIREBASE_APP_ID` | *(from `.env.local`)* |
+
+Then **redeploy**. Vite inlines `VITE_*` values at build time, so changing them
+requires a new build — a page refresh is not enough.
+
+### 4. Post-deploy checks
+
+- Dashboard → **Firebase / Data** reads **Connected**, not "Demo store".
+- Run a simulation and confirm documents appear in Firestore.
+- **Firestore rules need no change** — they are origin-independent and already
+  deployed from `firestore.rules`.
+- No Firebase **Auth** is used, so there is no Authorized Domain to add. If you
+  later restrict the API key by HTTP referrer in Google Cloud, add
+  `https://<your-app>.vercel.app/*`.
 
 ## How it works
 
 - `src/firebase/firebase.js` — initialises Firebase from `VITE_FIREBASE_*`.
 - `src/firebase/cameraEvents.js` — `saveCameraDetection(vehicle, camera, simulation)`
-  is the **only** Firestore write path (collection `cameraEvents`,
-  `detectionTimestamp: serverTimestamp()`).
+  is the **only** way a `cameraEvents` document is created (with
+  `detectionTimestamp: serverTimestamp()`). Blacklisted plates never reach it.
+- `src/services/firebaseService.js` — `recordBlacklistDetection(...)` writes a
+  blacklisted crossing onto its `blacklistedVehicles` document.
 - `src/context/SimulationContext.jsx` — when a vehicle crosses a camera
   detection point (once per vehicle per camera per run), it calls
   `saveCameraDetection()`.

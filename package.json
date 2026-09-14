@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "TrafIQ — Intelligent Traffic Monitoring & Vehicle Journey Correlation (Functional Demonstration Prototype)",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

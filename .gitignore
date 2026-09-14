@@ -14,8 +14,8 @@ dist-ssr/
 *-firebase-adminsdk-*.json
 credentials.json
 
-# Local backend runtime data
-data/
+# Local backend runtime data (repo root only — must NOT match src/data/)
+/data/
 *.log
 .venv/
 venv/
@@ -25,9 +25,14 @@ __pycache__/
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 .DS_Store
 .idea/
 
 # Firebase
 .firebase/
 firebase-debug.log
+
+# Vercel — local project link + build cache
+.vercel
