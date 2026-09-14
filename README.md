@@ -36,8 +36,22 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 ```
 
-If these are missing or blank the app still runs in a fully local **demo mode**
-(status panel shows "Demo store") — Firebase is optional.
+These are Firebase **Web SDK client identifiers**, not credentials — Google ships
+them in the browser bundle by design. Access is controlled by `firestore.rules`
+and API key restrictions, never by hiding these values.
+
+**Config resolution** (`src/firebase/firebase.js`), per field:
+
+1. `VITE_FIREBASE_*` from the environment — **only when non-empty**.
+2. `FALLBACK_FIREBASE_CONFIG` committed in `src/firebase/firebase.js`.
+
+The committed fallback means the app is configured out of the box. Empty host
+environment variables are ignored on purpose: Vite gives host vars precedence
+over `.env.production`, so a dashboard that defines `VITE_FIREBASE_*` with
+**blank** values would otherwise silently knock the deployed app into demo mode.
+
+The app only degrades to fully-local **demo mode** (status panel shows
+"Demo store") if that fallback is blanked out deliberately.
 
 ### Firestore data model — exactly TWO collections
 
@@ -205,9 +219,9 @@ without Firebase config. Everything still works, but only in `localStorage` —
 
 | Symptom | Cause |
 |---|---|
-| "Demo store", no console errors | Build had no `VITE_FIREBASE_*` (env vars unset or misnamed — a missing `VITE_` prefix fails silently) |
+| "Demo store", no console errors | Build had no usable Firebase config — **blank** `VITE_FIREBASE_*` host vars overriding `.env.production`. Clear them in the host dashboard, or ensure `FALLBACK_FIREBASE_CONFIG` is filled in |
 | "Connected" but writes fail with `Missing or insufficient permissions` | `firestore.rules` not deployed, or the API key is restricted to another origin |
-| A desktop browser console warning appears | Same as row 1 — the app logs it explicitly in production builds |
+| Collections missing in Firebase Console | Expected until the first write — an empty collection does not exist. Run a simulation; the collection appears on the first camera crossing |
 
 To check what a live deployment actually built, grep its bundle for your project
 id. If it is absent, the config never made it into the build:
