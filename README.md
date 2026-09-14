@@ -41,47 +41,99 @@ If these are missing or blank the app still runs in a fully local **demo mode**
 
 ### Firestore data model — exactly TWO collections
 
-| Collection | Written when | Written by |
+A vehicle reaches Firestore **only when it actually crosses a camera**. Fleet
+creation ("Save Vehicles") is application state + `localStorage` only — there is
+no `vehicles` collection and `firestore.rules` denies creating one. Nothing is
+written on Start Simulation, on animation frames, or on movement updates.
+
+| Event | Collection | Document `eventType` |
 |---|---|---|
-| `cameraEvents` | a **non-blacklisted** vehicle crosses a camera | `saveCameraDetection()` |
-| `blacklistedVehicles` | the Authority adds a plate, **and** each time a blacklisted vehicle crosses a camera | `addBlacklistedVehicle()`, `recordBlacklistDetection()` |
+| Normal vehicle detected | `cameraEvents` | `CAMERA_PASSAGE` |
+| Blacklisted vehicle detected | `blacklistedVehicles` | `BLACKLISTED_VEHICLE_DETECTION` |
+| Plate added to the watchlist | `blacklistedVehicles` | *(none — watchlist entry)* |
 
-**A vehicle only ever appears in Firestore as the result of a camera detection.**
-Registering the fleet ("Save Vehicles") writes to `localStorage` only — there is
-no `vehicles` collection, and `firestore.rules` denies creating one.
+```text
+                 VEHICLE DETECTED
+                        |
+              is plate blacklisted?
+                 +------+------+
+                NO            YES
+                 |              |
+                 v              v
+          cameraEvents   blacklistedVehicles
+                 |              |
+         normal detection   blacklist detection
+```
 
-**Blacklisted plates are never written to `cameraEvents`.** When a blacklisted
-vehicle is detected it is recorded on its own `blacklistedVehicles` document
-instead, so the two concerns never mix:
-
-- `cameraEvents` = traffic volume, ANPR history, journey correlation.
-- `blacklistedVehicles` = the watchlist **and** the audit trail of where/when
-each watchlisted plate was seen.
+A blacklisted plate **never** appears in `cameraEvents`, and a normal plate
+**never** appears in `blacklistedVehicles`. Blacklist status is evaluated from
+the current watchlist at the moment of the crossing (plates normalised —
+uppercase, spaces stripped), not from any value stored at fleet-creation time.
 
 A blacklisted crossing still shows the live ANPR feed card, the red toast and
-the Authority alert modal — it simply produces no `cameraEvents` document.
+the Authority alert modal, and the vehicle completes the whole
+START → CAM-01 → CAM-02 → CAM-03 → END run. Detection is fire-and-forget, so a
+Firebase failure can never stall or reject the vehicle.
 
-Each blacklist document looks like:
+### `detectionTimestamp` — the camera's configured time
+
+`detectionTimestamp` is a real Firestore **Timestamp** built from the **date and
+start time configured for that camera** in the Camera Configuration UI. It is
+never `serverTimestamp()`, never `Date.now()` and never the browser clock.
+
+With CAM-01 = `10:30:00`, CAM-02 = `10:35:00`, CAM-03 = `10:40:00` on
+`2026-09-14`, the three documents carry those three times respectively.
+
+The value is parsed as **local** time (`new Date('YYYY-MM-DDTHH:mm:ss')` carries
+no timezone designator, so it is read as local — the convention the simulation
+clock already used), so the configured wall-clock time is preserved with no
+accidental UTC shift. That same instant drives the in-app ANPR feed and the
+Track Vehicle journey, so the UI and Firestore always agree.
+
+### `blacklistedVehicles` holds two document shapes
+
+Told apart by `eventType`.
+
+**Watchlist entry** — created when the Authority adds a plate:
+
+```jsonc
+{ "numberPlate": "TN01BB2222", "createdAt": "<server timestamp>" }
+```
+
+**Detection record** — ONE document per blacklisted camera crossing:
 
 ```jsonc
 {
-  "numberPlate": "TN01AB1234",
-  "createdAt": "<server timestamp>",
-  "detectionCount": 3,                        // total crossings seen
-  "lastDetectedAt": 1757862482000,             // simulation-clock ms
-  "lastCameraId": "CAM-03",
-  "lastLocation": "Marina Beach Road",
-  "detections": [                             // newest first, capped at 20
-    { "ts": 1757862482000, "cameraId": "CAM-03",
-      "location": "Marina Beach Road",
-      "vehicleModel": "Hyundai Creta", "vehicleColour": "White" }
-  ]
+  "numberPlate": "TN01BB2222",
+  "vehicleId": "veh_…",
+  "vehicleModel": "Honda",
+  "vehicleColour": "Black",
+  "cameraId": "CAM-01",
+  "location": "Anna Salai Junction",
+  "simulationPlace": "Chennai",
+  "simulationDate": "2026-09-14",
+  "detectionTimestamp": "<Timestamp — the camera's configured date + time>",
+  "eventType": "BLACKLISTED_VEHICLE_DETECTION"
 }
 ```
 
-The **Authority Console → Blacklist Alert History** panel reads these
-`detections`; **Clear Recordings** empties them (and purges any legacy
-blacklisted rows still sitting in `cameraEvents` from before the split).
+Because detections are their own documents, removing a plate from the watchlist
+deletes **only** the watchlist entry — its detection history is preserved. The
+**Authority Console → Blacklist Alert History** panel reads the detection
+records; **Clear Recordings** deletes those (and purges legacy blacklisted rows
+left in `cameraEvents` from before the split), leaving the watchlist intact.
+
+**Track Vehicle** searches both collections, so a journey resolves whether the
+plate is normal or blacklisted.
+
+### Verifying the collections
+
+`scripts/verify-firestore.mjs` dumps both collections and asserts the
+separation invariant:
+
+```bash
+node scripts/verify-firestore.mjs
+```
 
 ### Security rules
 
@@ -182,8 +234,9 @@ curl -s https://<your-app>.vercel.app | grep -oE '/assets/[^"]+\.js' | head -1
 - `src/firebase/cameraEvents.js` — `saveCameraDetection(vehicle, camera, simulation)`
   is the **only** way a `cameraEvents` document is created (with
   `detectionTimestamp: serverTimestamp()`). Blacklisted plates never reach it.
-- `src/services/firebaseService.js` — `recordBlacklistDetection(...)` writes a
-  blacklisted crossing onto its `blacklistedVehicles` document.
+- `src/services/firebaseService.js` — `addBlacklistDetection(...)` writes ONE
+  document per blacklisted crossing into `blacklistedVehicles` (tagged
+  `BLACKLISTED_VEHICLE_DETECTION`), and `trackVehicle()` queries both collections.
 - `src/context/SimulationContext.jsx` — when a vehicle crosses a camera
   detection point (once per vehicle per camera per run), it calls
   `saveCameraDetection()`.

@@ -16,7 +16,7 @@ import {
   ANPR_TOAST_MS,
   SIM_DEFAULTS
 } from '../data/constants'
-import { uid, todayLocalISO, nowLocalTime, blankCameraConfigs, shortStamp } from '../utils/format'
+import { uid, todayLocalISO, nowLocalTime, blankCameraConfigs, shortStamp, cameraDateTime } from '../utils/format'
 import { firebaseService } from '../services/firebaseService'
 import { saveCameraDetection } from '../firebase/cameraEvents'
 
@@ -78,6 +78,7 @@ export function SimulationProvider({ children }) {
   const [feed, setFeed] = useState([]) // ANPR detection feed (newest first)
   const [events, setEvents] = useState([]) // recent camera events (from store)
   const [blacklistedVehicles, setBlacklistedVehicles] = useState([])
+  const [blacklistDetections, setBlacklistDetections] = useState([])
   const [blacklistAlerts, setBlacklistAlerts] = useState([])
   const [mode, setMode] = useState('demo')
   const [toasts, setToasts] = useState([])
@@ -117,10 +118,12 @@ export function SimulationProvider({ children }) {
     setMode(m)
     const unsub = firebaseService.subscribe((rows) => setEvents(rows))
     const unsubBL = firebaseService.subscribeBlacklist((list) => setBlacklistedVehicles(list))
+    const unsubBLD = firebaseService.subscribeBlacklistDetections((list) => setBlacklistDetections(list))
     const errUnsub = firebaseService.onError((msg) => addToast('err', msg))
     return () => {
       unsub()
       unsubBL()
+      unsubBLD()
       errUnsub()
     }
   }, [addToast])
@@ -228,7 +231,15 @@ export function SimulationProvider({ children }) {
   // ---------- fire a camera passage event ----------
   const fireDetection = useCallback(
     (vehicle, camera, detectTs) => {
-      const ts = detectTs || Date.now()
+      // The camera's CONFIGURED date + time is the authoritative detection
+      // timestamp — not the browser clock. Falls back to the simulation clock
+      // only if the camera has no valid config, which cannot happen once the
+      // simulation has started (it requires all cameras to be configured).
+      const detectionDate = cameraDateTime(camera)
+      if (!detectionDate) {
+        console.error('TrafIQ: camera has no configured date/time — falling back to the simulation clock', camera?.id)
+      }
+      const ts = detectionDate ? detectionDate.getTime() : detectTs || Date.now()
       // Check CURRENT blacklist at detection time
       const isBlacklisted = firebaseService.isBlacklisted(vehicle.numberPlate)
 
@@ -247,22 +258,25 @@ export function SimulationProvider({ children }) {
         setBlacklistAlerts((prev) => [alertItem, ...prev])
         addToast('err', `⚠ BLACKLISTED VEHICLE DETECTED: ${normPlate} at ${camera.id}`)
 
-        // The crossing is recorded on the vehicle's own blacklist entry — never
-        // as a camera event — so `cameraEvents` stays free of blacklisted plates.
+        // A blacklisted crossing goes to `blacklistedVehicles` ONLY — never to
+        // `cameraEvents`. Fire-and-forget: the simulation must never wait on
+        // Firebase, and a failure must never stop the vehicle.
         firebaseService
-          .recordBlacklistDetection({
-            numberPlate: vehicle.numberPlate,
-            vehicleModel: vehicle.model,
-            vehicleColour: vehicle.colour,
-            cameraId: camera.id,
-            location: camera.location,
-            ts
+          .addBlacklistDetection({
+            vehicle,
+            camera,
+            simulation: {
+              place: simSnapshotRef.current.place,
+              date: simSnapshotRef.current.date
+            },
+            detectionDate
           })
           .then((res) => {
-            if (res && res.ok === false) addToast('err', 'Firebase connection error — blacklist alert kept locally')
+            if (res && res.ok === false) addToast('err', 'Firebase connection error — blacklist detection kept locally')
           })
-          .catch(() => {
-            addToast('err', 'Firebase connection error — blacklist alert kept locally')
+          .catch((err) => {
+            console.error('Failed to save blacklist detection:', err)
+            addToast('err', 'Firebase connection error — blacklist detection kept locally')
           })
       }
 
@@ -317,7 +331,7 @@ export function SimulationProvider({ children }) {
 
       // ── Persisted record: CAMERA_PASSAGE, once per crossing ────────────────
       // Blacklisted plates are deliberately NOT recorded as camera events: they
-      // were written to their blacklist entry above instead. They still appear
+      // were written to `blacklistedVehicles` above instead. They still appear
       // in the live ANPR feed, but never in `cameraEvents`.
       if (isBlacklisted) return
 
@@ -330,13 +344,13 @@ export function SimulationProvider({ children }) {
           place: simSnapshotRef.current.place,
           date: simSnapshotRef.current.date
         },
-        ts,
-        false
+        detectionDate
       )
         .then((res) => {
           if (res && res.ok === false) addToast('err', 'Firebase connection error — detection kept locally')
         })
-        .catch(() => {
+        .catch((err) => {
+          console.error('Failed to save camera detection:', err)
           addToast('err', 'Firebase connection error — detection kept locally')
         })
     },
@@ -501,6 +515,7 @@ export function SimulationProvider({ children }) {
       feed,
       events,
       blacklistedVehicles,
+      blacklistDetections,
       blacklistAlerts,
       addBlacklistedVehicle,
       removeBlacklistedVehicle,
@@ -520,7 +535,7 @@ export function SimulationProvider({ children }) {
       cameras, configuredCount, allConfigured, updateCamera, openCameraConfig,
       closeCameraConfig, cameraConfigTarget, attention,
       phase, positions, lanes, detected, flash, camUI, feed, events,
-      blacklistedVehicles, blacklistAlerts, addBlacklistedVehicle, removeBlacklistedVehicle,
+      blacklistedVehicles, blacklistDetections, blacklistAlerts, addBlacklistedVehicle, removeBlacklistedVehicle,
       dismissBlacklistAlert, clearBlacklistRecordings, clearAllDetections, mode, stats, toasts, simClock, startSimulation, resetSimulation, addToast
     ]
   )

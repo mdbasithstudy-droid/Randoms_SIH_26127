@@ -14,7 +14,11 @@ export const STORAGE_KEYS = {
   sim: 'trafiq_sim',
   vehicles: 'trafiq_vehicles',
   cameras: 'trafiq_cameras',
-  events: 'trafiq_events'
+  events: 'trafiq_events',
+  // watchlist entries (current blacklist state)
+  blacklist: 'trafiq_blacklist',
+  // blacklisted vehicle camera crossings (separate from cameraEvents)
+  blacklistDetections: 'trafiq_blacklist_detections'
 }
 
 // ---------- simulation timing (milliseconds) ----------

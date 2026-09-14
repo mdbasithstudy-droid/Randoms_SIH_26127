@@ -1,24 +1,28 @@
 // cameraEvents — the only CAMERA EVENT write path in the app.
 //
 // A document is written exclusively when a vehicle crosses a fixed camera
-// detection point. Vehicle position / animation frames are never written.
+// detection point. Vehicle position / animation frames are never written, and
+// fleet creation never touches Firestore.
 //
 // ⚠ Blacklisted plates NEVER reach this module. When a blacklisted vehicle is
-// detected it is recorded on its own `blacklistedVehicles` document instead —
-// see firebaseService.recordBlacklistDetection().
+// detected it is written to `blacklistedVehicles` instead — see
+// firebaseService.addBlacklistDetection().
 //
-// saveCameraDetection(vehicle, camera, simulation, detectionTs, isBlacklisted)
+// saveCameraDetection(vehicle, camera, simulation, detectionDate)
 //   vehicle       -> { id, numberPlate, model, colour }
-//   camera        -> { id, location }            (configured camera info)
-//   simulation    -> { place, date }             (session metadata)
-//   detectionTs   -> number                      (simulation clock ts)
-//   isBlacklisted -> boolean                     (blacklist status at detection time)
+//   camera        -> { id, location, date, startTime }  (configured camera)
+//   simulation    -> { place, date }                    (session metadata)
+//   detectionDate -> Date   the CAMERA'S configured date + start time, built by
+//                           src/utils/format.js -> cameraDateTime()
 //
-// Writes ONE document to the `cameraEvents` collection per call. The engine
-// guarantees this fires at most once per vehicle per camera per simulation.
+// `detectionDate` is the authoritative detection time and is stored as a real
+// Firestore Timestamp (never serverTimestamp(), never the browser clock).
+//
+// One document per vehicle per camera per simulation — the engine guarantees
+// this fires at most once per crossing.
 import { firebaseService } from '../services/firebaseService'
 
-export async function saveCameraDetection(vehicle, camera, simulation, detectionTs, isBlacklisted = false) {
+export async function saveCameraDetection(vehicle, camera, simulation, detectionDate) {
   const payload = {
     vehicleId: vehicle?.id,
     numberPlate: vehicle?.numberPlate,
@@ -32,8 +36,9 @@ export async function saveCameraDetection(vehicle, camera, simulation, detection
     simulationDate: simulation?.date,
 
     eventType: 'CAMERA_PASSAGE',
-    isBlacklisted: Boolean(isBlacklisted),
-    ts: detectionTs || Date.now() // client-side simulation-clock time (for display)
+    isBlacklisted: false,
+    detectionDate,
+    ts: detectionDate instanceof Date ? detectionDate.getTime() : undefined
   }
   return firebaseService.addEvent(payload)
 }

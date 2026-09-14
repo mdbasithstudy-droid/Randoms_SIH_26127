@@ -106,25 +106,14 @@ function BlacklistManager() {
 }
 
 function BlacklistAlertHistory() {
-  const { blacklistedVehicles, clearBlacklistRecordings } = useSimulation()
+  const { blacklistDetections, clearBlacklistRecordings } = useSimulation()
 
-  // Crossings by blacklisted vehicles are stored on the blacklist entries
-  // themselves (`blacklistedVehicles[].detections`) — never in `cameraEvents`.
+  // Blacklisted crossings are their own documents in `blacklistedVehicles`
+  // (eventType: 'BLACKLISTED_VEHICLE_DETECTION') — they are never in
+  // `cameraEvents`, so this reads the blacklist detection stream.
   const alerts = useMemo(
-    () =>
-      (blacklistedVehicles || [])
-        .flatMap((item) =>
-          (item.detections || []).map((d, i) => ({
-            key: `${item.id}-${d.ts}-${i}`,
-            numberPlate: item.numberPlate,
-            vehicleModel: d.vehicleModel,
-            cameraId: d.cameraId,
-            location: d.location,
-            ts: d.ts
-          }))
-        )
-        .sort((a, b) => (b.ts || 0) - (a.ts || 0)),
-    [blacklistedVehicles]
+    () => [...(blacklistDetections || [])].sort((a, b) => (b.ts || 0) - (a.ts || 0)),
+    [blacklistDetections]
   )
 
   return (
@@ -159,7 +148,7 @@ function BlacklistAlertHistory() {
             const timeStr = shortStamp(e.ts).replace(' IST', '')
             return (
               <div
-                key={e.key}
+                key={e.id || e.refId}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',

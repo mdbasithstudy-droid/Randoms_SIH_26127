@@ -74,3 +74,20 @@ export function blankCameraConfigs(cameras) {
   })
   return out
 }
+
+/**
+ * The authoritative detection time for a camera: the date + start time the
+ * operator configured for it in the Camera Configuration UI.
+ *
+ * Parsed as LOCAL time — `new Date('YYYY-MM-DDTHH:mm:ss')` has no timezone
+ * designator, so it is read as local, exactly like the simulation clock in
+ * SimulationContext. That keeps the stored instant aligned with the wall-clock
+ * the operator typed, with no unintended UTC shift.
+ *
+ * Returns null when the camera has no valid configuration.
+ */
+export function cameraDateTime(camera) {
+  if (!camera || !camera.date || !camera.startTime) return null
+  const d = new Date(`${camera.date}T${withSeconds(camera.startTime)}`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
