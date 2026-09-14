@@ -127,26 +127,44 @@ git push
 Vercel → **Add New → Project** → import the repo. The **Vite** preset is
 detected automatically; leave Build Command and Output Directory untouched.
 
-### 3. Add the Firebase environment variables — **required**
+### 3. Firebase config in the deploy
 
-`.env.local` is gitignored, so it is **not** uploaded. Without these variables a
-Vercel build silently falls back to local demo mode ("Demo store") and writes
-nothing to Firestore.
+`.env.local` is gitignored and is **not** uploaded, so the Firebase values live
+in **`.env.production`**, which Vite loads automatically for `vite build` and
+which *is* committed. Production builds are therefore configured out of the box —
+no dashboard setup required.
 
-Project → **Settings → Environment Variables** → add all six for
-**Production, Preview and Development**:
+> These are Firebase **Web SDK client identifiers**, not credentials — Google
+> ships them in the browser bundle by design. Access is controlled by
+> `firestore.rules` and API key restrictions, not by hiding them. Never put a
+> service-account JSON or Admin SDK key in this file.
 
-| Name | Value |
+**Optional override:** if you set the same names in Vercel →
+**Settings → Environment Variables**, those **take precedence** over
+`.env.production` (verified). Useful if you ever point the deploy at a different
+Firebase project. After changing them you must **redeploy** — Vite inlines
+`VITE_*` values at build time, so a page refresh is not enough.
+
+### Troubleshooting: deployed site says "Demo store"
+
+The Dashboard's **Firebase / Data** tile shows **Demo store** when the app built
+without Firebase config. Everything still works, but only in `localStorage` —
+**nothing is written to Firestore**.
+
+| Symptom | Cause |
 |---|---|
-| `VITE_FIREBASE_API_KEY` | *(from `.env.local`)* |
-| `VITE_FIREBASE_AUTH_DOMAIN` | *(from `.env.local`)* |
-| `VITE_FIREBASE_PROJECT_ID` | *(from `.env.local`)* |
-| `VITE_FIREBASE_STORAGE_BUCKET` | *(from `.env.local`)* |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | *(from `.env.local`)* |
-| `VITE_FIREBASE_APP_ID` | *(from `.env.local`)* |
+| "Demo store", no console errors | Build had no `VITE_FIREBASE_*` (env vars unset or misnamed — a missing `VITE_` prefix fails silently) |
+| "Connected" but writes fail with `Missing or insufficient permissions` | `firestore.rules` not deployed, or the API key is restricted to another origin |
+| A desktop browser console warning appears | Same as row 1 — the app logs it explicitly in production builds |
 
-Then **redeploy**. Vite inlines `VITE_*` values at build time, so changing them
-requires a new build — a page refresh is not enough.
+To check what a live deployment actually built, grep its bundle for your project
+id. If it is absent, the config never made it into the build:
+
+```bash
+curl -s https://<your-app>.vercel.app | grep -oE '/assets/[^"]+\.js' | head -1
+# then fetch that /assets/*.js and search for your projectId
+```
+
 
 ### 4. Post-deploy checks
 
