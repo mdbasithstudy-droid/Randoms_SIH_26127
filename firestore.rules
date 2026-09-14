@@ -3,8 +3,8 @@ rules_version = '2';
 // TrafIQ — Firestore security rules for project `trafiq-7680f`.
 //
 // Exactly TWO collections exist, matching the app's two write paths:
-//   • cameraEvents        — one document per vehicle crossing a camera
-//   • blacklistedVehicles — plates flagged by the Authority Console
+//   • cameraEvents        — one document per NORMAL vehicle crossing a camera
+//   • blacklistedVehicles — one document per BLACKLISTED vehicle crossing a camera
 //
 // Note the data model guarantees this enforces:
 //   1. A vehicle can only ever appear in Firestore as the RESULT OF A CAMERA
@@ -12,7 +12,10 @@ rules_version = '2';
 //      is no vehicles collection here.
 //   2. A BLACKLISTED plate never appears in `cameraEvents` at all. Its
 //      crossings become their own `blacklistedVehicles` documents.
-//   3. `detectionTimestamp` is always a real Timestamp built from the camera's
+//   3. `blacklistedVehicles` holds DETECTION RECORDS ONLY. Maintaining the
+//      watchlist (adding/removing a plate) is application state and writes
+//      NOTHING to Firestore.
+//   4. `detectionTimestamp` is always a real Timestamp built from the camera's
 //      configured session time — never a server timestamp.
 //
 // ⚠ These rules are intentionally open (read: true / unauthenticated writes)
@@ -44,28 +47,21 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // ── Authority blacklist ──────────────────────────────────────────────────
-    // TWO document shapes live in this collection, told apart by `eventType`:
-    //   • watchlist ENTRY  → { numberPlate, createdAt }
-    //   • detection RECORD → { …, eventType: "BLACKLISTED_VEHICLE_DETECTION" }
+    // ── Blacklisted vehicle detections ───────────────────────────────────────
+    // DETECTION RECORDS ONLY — this collection exists solely to record a
+    // blacklisted vehicle crossing a camera. Adding a plate to the watchlist is
+    // application state and is never written here.
     match /blacklistedVehicles/{documentId} {
       allow read: if true;
 
-      allow create: if request.resource.data.numberPlate is string
+      allow create: if request.resource.data.eventType == 'BLACKLISTED_VEHICLE_DETECTION'
+                    && request.resource.data.numberPlate is string
                     && request.resource.data.numberPlate.size() > 0
-                    && (
-                         // watchlist entry — or a detection record with a valid
-                         // camera id and a camera-configured Timestamp
-                         request.resource.data.get('eventType', '') != 'BLACKLISTED_VEHICLE_DETECTION'
-                         || (
-                              request.resource.data.cameraId is string
-                              && request.resource.data.cameraId.matches('^CAM-0[1-9]$')
-                              && request.resource.data.detectionTimestamp is timestamp
-                            )
-                       );
+                    && request.resource.data.cameraId is string
+                    && request.resource.data.cameraId.matches('^CAM-0[1-9]$')
+                    && request.resource.data.detectionTimestamp is timestamp;
 
-      // Both shapes are append-only: detections are an audit trail and a
-      // watchlist entry's plate is never repointed at another vehicle.
+      // Detections are an audit trail — never edited in place.
       allow update: if false;
 
       allow delete: if true;

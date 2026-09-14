@@ -23,8 +23,7 @@ import {
   where,
   onSnapshot,
   getDocs,
-  Timestamp,
-  serverTimestamp
+  Timestamp
 } from 'firebase/firestore'
 
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase/firebaseConfig'
@@ -200,16 +199,8 @@ function listenFirestore() {
   )
 }
 
-// A watchlist ENTRY — created by the Authority Console when a plate is added.
-function normalizeBlacklistEntry(id, data) {
-  return {
-    id,
-    numberPlate: normalizePlate(data.numberPlate),
-    createdAt: data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : Date.now()
-  }
-}
-
-// A blacklisted vehicle DETECTION — one document per camera crossing.
+// A blacklisted vehicle DETECTION — the ONLY document shape in
+// `blacklistedVehicles`. One document per camera crossing.
 function normalizeBlacklistDetectionDoc(id, d) {
   if (!d) return null
   const detTs = d.detectionTimestamp && typeof d.detectionTimestamp.toMillis === 'function'
@@ -243,24 +234,19 @@ function listenFirestoreBlacklist() {
   firestoreBlacklistUnsub = onSnapshot(
     q,
     (snap) => {
-      const entries = []
       let detections = blacklistDetectionCache
       snap.docs.forEach((docSnap) => {
         const data = docSnap.data()
-        if (!data || !data.numberPlate) return
-        if (isBlacklistDetectionDoc(data)) {
-          const rec = normalizeBlacklistDetectionDoc(docSnap.id, data)
-          if (rec) detections = upsertDetection(detections, rec)
-        } else {
-          entries.push(normalizeBlacklistEntry(docSnap.id, data))
-        }
+        // `blacklistedVehicles` holds DETECTION records only. The watchlist
+        // itself is application state and is never written to Firestore, so any
+        // legacy watchlist document found here is ignored — it must never be
+        // allowed to overwrite the local blacklist.
+        if (!isBlacklistDetectionDoc(data)) return
+        const rec = normalizeBlacklistDetectionDoc(docSnap.id, data)
+        if (rec) detections = upsertDetection(detections, rec)
       })
-      entries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-      blacklistCache = entries
       blacklistDetectionCache = detections
-      persistLocalBlacklist()
       persistLocalBlacklistDetections()
-      notifyBlacklist()
       notifyBlacklistDetections()
     },
     (err) => {
@@ -395,7 +381,18 @@ function isBlacklisted(rawPlate) {
   return blacklistCache.some((item) => normalizePlate(item.numberPlate) === plate)
 }
 
-async function addBlacklistedVehicle(rawPlate) {
+/**
+ * Add a plate to the watchlist.
+ *
+ * The watchlist is APPLICATION STATE + localStorage ONLY — this writes NOTHING
+ * to Firestore. `blacklistedVehicles` receives a document only when a
+ * blacklisted vehicle actually crosses a camera (see addBlacklistDetection),
+ * so that collection holds detection records and nothing else.
+ *
+ * Trade-off: the blacklist therefore lives in this browser and does not sync
+ * to other devices.
+ */
+function addBlacklistedVehicle(rawPlate) {
   const plate = normalizePlate(rawPlate)
   if (!plate) {
     return { ok: false, error: 'Empty number plate' }
@@ -404,8 +401,6 @@ async function addBlacklistedVehicle(rawPlate) {
     return { ok: false, error: 'Vehicle is already blacklisted' }
   }
 
-  // Watchlist ENTRY only. Blacklisted vehicle DETECTIONS are separate documents
-  // in the same collection, tagged eventType: 'BLACKLISTED_VEHICLE_DETECTION'.
   const newItem = {
     id: uid('bl'),
     numberPlate: plate,
@@ -415,23 +410,6 @@ async function addBlacklistedVehicle(rawPlate) {
   blacklistCache = [newItem, ...blacklistCache]
   persistLocalBlacklist()
   notifyBlacklist()
-
-  if (mode === 'firestore') {
-    try {
-      const db = getFirestoreDb()
-      if (!db) throw new Error('Firestore not initialised')
-      const docRef = await addDoc(collection(db, BLACKLIST_COLLECTION), {
-        numberPlate: plate,
-        createdAt: serverTimestamp()
-      })
-      newItem.id = docRef.id
-      return { ok: true, item: newItem }
-    } catch (e) {
-      console.error('Firestore add blacklisted vehicle failed', e)
-      return { ok: true, item: newItem, warning: 'Saved locally' }
-    }
-  }
-
   return { ok: true, item: newItem }
 }
 

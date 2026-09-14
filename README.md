@@ -64,7 +64,11 @@ written on Start Simulation, on animation frames, or on movement updates.
 |---|---|---|
 | Normal vehicle detected | `cameraEvents` | `CAMERA_PASSAGE` |
 | Blacklisted vehicle detected | `blacklistedVehicles` | `BLACKLISTED_VEHICLE_DETECTION` |
-| Plate added to the watchlist | `blacklistedVehicles` | *(none — watchlist entry)* |
+| Plate added to the watchlist | *(no write)* — `localStorage` only | — |
+
+Adding a plate to the blacklist writes **nothing** to Firestore. `blacklistedVehicles`
+receives a document only when a blacklisted vehicle actually crosses a camera, so
+it contains detection records and nothing else.
 
 ```text
                  VEHICLE DETECTED
@@ -104,17 +108,10 @@ clock already used), so the configured wall-clock time is preserved with no
 accidental UTC shift. That same instant drives the in-app ANPR feed and the
 Track Vehicle journey, so the UI and Firestore always agree.
 
-### `blacklistedVehicles` holds two document shapes
+### `blacklistedVehicles` — detection records only
 
-Told apart by `eventType`.
-
-**Watchlist entry** — created when the Authority adds a plate:
-
-```jsonc
-{ "numberPlate": "TN01BB2222", "createdAt": "<server timestamp>" }
-```
-
-**Detection record** — ONE document per blacklisted camera crossing:
+Every document in this collection is one blacklisted vehicle crossing one
+camera, tagged `eventType: "BLACKLISTED_VEHICLE_DETECTION"`:
 
 ```jsonc
 {
@@ -131,11 +128,15 @@ Told apart by `eventType`.
 }
 ```
 
-Because detections are their own documents, removing a plate from the watchlist
-deletes **only** the watchlist entry — its detection history is preserved. The
-**Authority Console → Blacklist Alert History** panel reads the detection
-records; **Clear Recordings** deletes those (and purges legacy blacklisted rows
-left in `cameraEvents` from before the split), leaving the watchlist intact.
+There are no watchlist documents here — `firestore.rules` rejects any create
+without that `eventType`. The **Authority Console → Blacklist Alert History**
+panel reads these records; **Clear Recordings** deletes them (and purges legacy
+blacklisted rows left in `cameraEvents`) without affecting the watchlist.
+
+**The watchlist itself lives in this browser** (`localStorage`), so it is not
+shared between devices and is lost if site data is cleared. Detect-and-record is
+unaffected — only the list of plates to watch is local. If it needs to be shared,
+the watchlist wants its own collection.
 
 **Track Vehicle** searches both collections, so a journey resolves whether the
 plate is normal or blacklisted.

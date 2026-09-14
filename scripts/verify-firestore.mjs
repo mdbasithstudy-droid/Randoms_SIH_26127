@@ -61,7 +61,9 @@ for (const d of cameraEvents.slice().sort((a, b) => String(val(a.f.cameraId)).lo
 }
 
 console.log('\n=== blacklistedVehicles ===', blacklist.length, 'documents')
-console.log('  watchlist entries:', entries.length, '->', entries.map((e) => val(e.f.numberPlate)).join(', ') || '(none)')
+if (entries.length) {
+  console.log('  ⚠ unexpected NON-detection documents:', entries.length, '->', entries.map((e) => val(e.f.numberPlate)).join(', '))
+}
 console.log('  detection records:', detections.length)
 for (const d of detections.slice().sort((a, b) => String(val(a.f.cameraId)).localeCompare(String(val(b.f.cameraId))))) {
   console.log(
@@ -71,19 +73,19 @@ for (const d of detections.slice().sort((a, b) => String(val(a.f.cameraId)).loca
 }
 
 // ── invariant checks ────────────────────────────────────────────────────────
-const blacklistPlates = new Set(entries.map((e) => String(val(e.f.numberPlate)).replace(/\s+/g, '').toUpperCase()))
-const normalised = (s) => String(s || '').replace(/\s+/g, '').toUpperCase()
+// The watchlist is application state (localStorage), never Firestore, so the
+// only things verifiable from the database are:
+//   1. no blacklisted plate leaked into `cameraEvents`
+//   2. `blacklistedVehicles` contains nothing but detection records
 const leakedIntoCameraEvents = cameraEvents.filter((d) => val(d.f.isBlacklisted) === true)
-const onWatchlist = detections.filter((d) => blacklistPlates.has(normalised(val(d.f.numberPlate))))
+const nonDetectionDocs = blacklist.filter((d) => val(d.f.eventType) !== 'BLACKLISTED_VEHICLE_DETECTION')
 
 console.log('\n=== invariants ===')
 console.log(
-  '  cameraEvents docs flagged isBlacklisted=true :', leakedIntoCameraEvents.length,
+  '  cameraEvents docs flagged isBlacklisted=true  :', leakedIntoCameraEvents.length,
   leakedIntoCameraEvents.length ? '(VIOLATION)' : '(ok)'
 )
 console.log(
-  '  detection records for a currently-watchlisted plate:', onWatchlist.length, '/', detections.length,
-  detections.length && onWatchlist.length < detections.length
-    ? '(lower than total is expected once a plate is removed from the watchlist — its history is kept)'
-    : ''
+  '  blacklistedVehicles docs that are NOT detections:', nonDetectionDocs.length,
+  nonDetectionDocs.length ? '(VIOLATION)' : '(ok)'
 )
